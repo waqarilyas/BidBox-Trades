@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,6 +33,12 @@ type Account struct {
 		UnrealizedPL      string `json:"unrealizedPL"`
 		Bonus             string `json:"bonus"`
 	} `json:"data"`
+}
+
+type User struct {
+	Capital      int
+	Trade_amount float64
+	First_order  float64
 }
 
 func (s *Server) Home(w http.ResponseWriter, r *http.Request) {
@@ -107,8 +114,24 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request) {
 		response.ERROR(w, http.StatusInternalServerError, err)
 		return
 	}
+	log.Println(val)
+	log.Println(int(math.Floor(val)))
 
-	response.JSON(w, http.StatusOK, val)
+	conds := models.Conditions{}
+	cond, err := conds.FindKeyById(s.DB, int(math.Floor(val/100)*100))
+
+	if err != nil {
+		response.ERROR(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	user := User{}
+	user.Capital = int(val)
+	user.Trade_amount = 0.08 * float64(cond.Capital)
+	user.First_order = user.Trade_amount / float64(cond.Positions)
+
+	log.Println(cond)
+	response.JSON(w, http.StatusOK, user)
 
 }
 
