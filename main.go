@@ -1,0 +1,40 @@
+package main
+
+import (
+	"os"
+
+	"github.com/sirupsen/logrus"
+
+	nested "github.com/antonfisher/nested-logrus-formatter"
+	"github.com/joho/godotenv"
+	"github.com/kryptomind/BidBox-Trades/controllers"
+)
+
+var server = controllers.Server{}
+
+func Run() {
+	err := godotenv.Load()
+	log := logrus.New()
+	log.SetFormatter(&nested.Formatter{
+		HideKeys:    true,
+		FieldsOrder: []string{"file", "function"},
+	})
+	if err != nil {
+		log.WithFields(logrus.Fields{
+			"file":     "main.go",
+			"function": "Run",
+		}).Fatal("Error getting env")
+	} else {
+		log.WithFields(logrus.Fields{
+			"file":     "main.go",
+			"function": "Run",
+		}).Info("Getting Values")
+	}
+
+	server.Initialize(os.Getenv("DB_DRIVER"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_PORT"), os.Getenv("DB_HOST"), os.Getenv("DB_NAME"))
+	server.Run(":8080")
+}
+
+func main() {
+	Run()
+}
