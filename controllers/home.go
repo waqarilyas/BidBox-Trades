@@ -1,12 +1,17 @@
 package controllers
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
+	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	helpers "github.com/ahmed-023/bitget-helpers"
 	"github.com/asaskevich/govalidator"
@@ -14,6 +19,9 @@ import (
 	"github.com/kryptomind/BidBox-Trades/response"
 	log "github.com/sirupsen/logrus"
 )
+
+var modes = []string{"conservative", "aggressive"}
+var strategies = []string{"cycle", "single", "stop make", "stop long", "stop short"}
 
 type Account struct {
 	Code        string `json:"code"`
@@ -33,6 +41,62 @@ type Account struct {
 		UnrealizedPL      string `json:"unrealizedPL"`
 		Bonus             string `json:"bonus"`
 	} `json:"data"`
+}
+
+func InitCoinPiars() ([]string, error) {
+
+	var coin_pairs []string
+
+	// Open the CSV file
+	file, err := os.Open("test.csv")
+	if err != nil {
+		fmt.Println("Error:", err)
+		return []string{}, err
+	}
+	defer file.Close()
+
+	// Create a new CSV reader
+	reader := csv.NewReader(file)
+
+	// Read all the CSV records
+	records, err := reader.ReadAll()
+	if err != nil {
+		fmt.Println("Error:", err)
+		return []string{}, err
+	}
+
+	// Iterate over the records and print the values
+	for _, record := range records {
+		for i, value := range record {
+			if i == 1 {
+				coin_pairs = append(coin_pairs, value)
+			}
+		}
+	}
+	return coin_pairs, nil
+}
+
+func AiStub(orders int) ([]string, []string, error) {
+	rand.Seed(time.Now().UnixNano()) // initialize the random number generator with the current time
+
+	// define an array of integers
+	coins, err := InitCoinPiars()
+
+	if err != nil {
+		return []string{}, []string{}, err
+	}
+
+	// create a slice to hold the selected elements
+	list := make([]string, orders)
+
+	// generate the random indices and select the corresponding elements
+	for i := 0; i < orders; i++ {
+		index := rand.Intn(len(coins)) // generate a random index within the range of the array
+		list[i] = coins[index]         // select the element at the random index and add it to the selected slice
+	}
+
+	middle := orders / 2
+	return list[middle:], list[:middle], nil
 }
 
 type User struct {
@@ -130,7 +194,14 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request) {
 	user.Trade_amount = 0.08 * float64(cond.Capital)
 	user.First_order = user.Trade_amount / float64(cond.Positions)
 
-	log.Println(cond)
+	long, short, err := AiStub(cond.Positions)
+	if err != nil {
+		response.ERROR(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	log.Println(long)
+	log.Println(short)
 	response.JSON(w, http.StatusOK, user)
 
 }
