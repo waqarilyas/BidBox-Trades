@@ -46,12 +46,7 @@ func AiStub(orders int) ([]string, []string, error) {
 	rand.Seed(time.Now().UnixNano()) // initialize the random number generator with the current time
 
 	// define an array of integers
-	coins, err := initCoinPiars()
-
-	if err != nil {
-		return []string{}, []string{}, err
-	}
-
+	coins := []string{"SETHSUSDT_SUMCBL"}
 	// create a slice to hold the selected elements
 	list := make([]string, orders)
 

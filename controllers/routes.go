@@ -5,7 +5,8 @@ import "github.com/kryptomind/BidBox-Trades/middleware"
 func (r *Server) initializeRoutes() {
 	s := r.Router.PathPrefix("/trades").Subrouter()
 
-	s.HandleFunc("/", middleware.MiddlewareJSON(r.Home)).Methods("GET")
+	s.HandleFunc("/", middleware.ValidateEmail(r.Home)).Methods("GET")
+	s.HandleFunc("/order", middleware.ValidateEmail(r.PlaceOrder)).Methods("POST")
 
 	/*//accounts routes
 	s.HandleFunc("/user", middleware.MiddlewareJSON(r.GetUserBalanceByExchange)).Methods("GET")

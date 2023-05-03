@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	helpers "github.com/ahmed-023/bitget-helpers"
-	"github.com/asaskevich/govalidator"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
@@ -45,18 +44,7 @@ type User struct {
 	First_order  float64
 }
 
-func (s *Server) Home(w http.ResponseWriter, r *http.Request) {
-	email := r.URL.Query().Get("email")
-	if email == "" {
-		response.ERROR(w, http.StatusBadRequest, errors.New("email is required"))
-		return
-	}
-
-	if !govalidator.IsEmail(email) {
-		response.ERROR(w, http.StatusBadRequest, errors.New("invalid email address"))
-		return
-	}
-
+func (s *Server) Home(w http.ResponseWriter, r *http.Request, email string) {
 	//get keys by user id
 	key := models.Key{}
 	keys, err := key.FindKeysByEmail(s.DB, email)
@@ -111,7 +99,7 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request) {
 		response.ERROR(w, http.StatusInternalServerError, err)
 		return
 	}
-
+	val = 300
 	err = utils.CheckBalance(val)
 
 	if err != nil {
@@ -138,6 +126,34 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		response.ERROR(w, http.StatusInternalServerError, err)
 		return
+	}
+
+	for i := 0; i < cond.Positions; i++ {
+		order := models.OrderRequest{}
+		orderResp := models.OrderResponse{}
+		order.Symbol = "SETHSUSDT_SUMCBL"
+		order.MarginCoin = "SUSDT"
+		order.Size = "0.01"
+		order.OrderType = "market"
+		if i%2 == 0 {
+			order.Side = "open_long"
+		} else {
+			order.Side = "open_short"
+		}
+		str, err := NewOrder(api_key, secret_key, passphrase, &order)
+		if err != nil {
+			response.ERROR(w, http.StatusInternalServerError, err)
+			return
+		}
+
+		err = json.Unmarshal([]byte(str), &orderResp)
+		if err != nil {
+			response.ERROR(w, http.StatusBadRequest, err)
+			return
+		}
+		res := map[string]string{"client_id": orderResp.Data.ClientOid, "order_id": orderResp.Data.OrderID}
+		log.Println(res)
+
 	}
 
 	log.Println(long)
