@@ -12,6 +12,8 @@ type OrderRequest struct {
 	Size       string `json:"size"`
 	Side       string `json:"side"`
 	OrderType  string `json:"orderType"`
+	StopLoss   string `json:"presetStopLossPrice"`
+	TakeProfit string `json:"presetTakeProfitPrice"`
 }
 
 type OrderResponse struct {

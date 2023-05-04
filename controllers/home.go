@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -120,6 +121,8 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request, email string) {
 	user := User{}
 	user.Capital = int(val)
 	user.Trade_amount = 0.08 * float64(cond.Capital)
+	stop_loss := 0.8 * float64(cond.Capital)
+	take_profit := 0.1 * float64(cond.Capital)
 	user.First_order = user.Trade_amount / float64(cond.Positions)
 
 	long, short, err := utils.AiStub(cond.Positions)
@@ -135,6 +138,8 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request, email string) {
 		order.MarginCoin = "SUSDT"
 		order.Size = "0.01"
 		order.OrderType = "market"
+		order.StopLoss = fmt.Sprintf("%F", stop_loss)
+		order.TakeProfit = fmt.Sprintf("%F", take_profit)
 		if i%2 == 0 {
 			order.Side = "open_long"
 		} else {
