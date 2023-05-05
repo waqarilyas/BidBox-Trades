@@ -4,9 +4,12 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"log"
 	"math/rand"
 	"os"
 	"time"
+
+	helpers "github.com/ahmed-023/bitget-helpers"
 )
 
 func initCoinPiars() ([]string, error) {
@@ -65,4 +68,23 @@ func CheckBalance(val float64) error {
 		return errors.New("Balance should be at least 200 USDT")
 	}
 	return nil
+}
+
+func DecryptKeys(api_key string, secret_key string, passphrase string) (string, string, string) {
+	api_key, err := helpers.DecryptStrings(api_key)
+	if err != nil {
+		log.Fatal(err)
+		return "", "", ""
+	}
+	secret_key, err = helpers.DecryptStrings(secret_key)
+	if err != nil {
+		log.Fatal(err)
+		return "", "", ""
+	}
+	passphrase, err = helpers.DecryptStrings(passphrase)
+	if err != nil {
+		log.Fatal(err)
+		return "", "", ""
+	}
+	return api_key, secret_key, passphrase
 }

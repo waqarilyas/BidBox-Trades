@@ -188,16 +188,54 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := models.User{}
-	users, err := user.GetAllUsers(s.DB)
-	if err != nil {
-		response.ERROR(w, http.StatusInternalServerError, err)
-		return
-	}
-	fmt.Println(users)
+	stop_loss := 0.8 * float64(300)
+	//take_profit := 1.1 * float64(300)
 
 	for _, v := range *keys {
-		fmt.Println(v.Service)
+		api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
+		if v.Service == "bitget" {
+			order := models.OrderRequest{}
+			orderResp := models.OrderResponse{}
+			if trade_req.ClosePrice > trade_req.OpenPrice {
+				if v.OpenLong <= 0 {
+					continue
+				}
+				order.Side = "open_long"
+			} else {
+				if v.OpenShort <= 0 {
+					continue
+				}
+				order.Side = "open_short"
+			}
+			order.Symbol = trade_req.CoinPair
+			order.MarginCoin = "SUSDT"
+			order.Size = "0.01"
+			order.OrderType = "market"
+			order.StopLoss = fmt.Sprintf("%F", stop_loss)
+			//order.TakeProfit = fmt.Sprintf("%F", take_profit)
+
+			str, err := NewOrder(api_key, secret_key, passphrase, &order)
+			if err != nil {
+				response.ERROR(w, http.StatusInternalServerError, err)
+				return
+			}
+
+			log.Println(str)
+
+			err = json.Unmarshal([]byte(str), &orderResp)
+			if err != nil {
+				response.ERROR(w, http.StatusBadRequest, err)
+				return
+			}
+			res := map[string]string{"client_id": orderResp.Data.ClientOid, "order_id": orderResp.Data.OrderID}
+			log.Println(res)
+			key, err := v.ChangePositions(s.DB, v.OpenLong-1, "long")
+			if err != nil {
+				response.ERROR(w, http.StatusInternalServerError, err)
+				return
+			}
+			log.Println(key)
+		}
 	}
 	response.JSON(w, http.StatusOK, "trades made")
 }

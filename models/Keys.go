@@ -15,6 +15,8 @@ type Key struct {
 	SecretKey  string    `gorm:"not null;unique" json:"secret_key"`
 	Passphrase string    `gorm:"" json:"passphrase"`
 	UserEmail  string    `json:"user_email"`
+	OpenShort  int
+	OpenLong   int
 }
 
 func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
@@ -66,4 +68,30 @@ func (u *Key) FindKeyByUserIdAndShort(db *gorm.DB, uid uuid.UUID, service string
 		return &Key{}, errors.New("no connected keys found")
 	}
 	return &Keys, nil
+}
+
+func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, error) {
+	if pos_type == "short" {
+		db = db.Debug().Model(&Key{}).Where("user_email = ?", u.UserEmail).Take(&Key{}).UpdateColumns(
+			map[string]interface{}{
+				"open_short": pos,
+			},
+		)
+	} else {
+		db = db.Debug().Model(&Key{}).Where("user_email = ?", u.UserEmail).Take(&Key{}).UpdateColumns(
+			map[string]interface{}{
+				"open_long": pos,
+			},
+		)
+	}
+
+	if db.Error != nil {
+		return &Key{}, db.Error
+	}
+	// This is the display the updated user
+	err := db.Debug().Model(&Key{}).Where("user_email = ?", u.UserEmail).Take(&u).Error
+	if err != nil {
+		return &Key{}, err
+	}
+	return u, nil
 }
