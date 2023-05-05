@@ -188,7 +188,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stop_loss := 0.8 * float64(300)
+	//	stop_loss := 0.8 * float64(300)
 	//take_profit := 1.1 * float64(300)
 
 	for _, v := range *keys {
@@ -200,18 +200,30 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				if v.OpenLong <= 0 {
 					continue
 				}
+				key, err := v.ChangePositions(s.DB, v.OpenLong-1, "long")
+				if err != nil {
+					response.ERROR(w, http.StatusInternalServerError, err)
+					return
+				}
+				log.Println(key)
 				order.Side = "open_long"
 			} else {
 				if v.OpenShort <= 0 {
 					continue
 				}
+				key, err := v.ChangePositions(s.DB, v.OpenShort-1, "short")
+				if err != nil {
+					response.ERROR(w, http.StatusInternalServerError, err)
+					return
+				}
+				log.Println(key)
 				order.Side = "open_short"
 			}
 			order.Symbol = trade_req.CoinPair
 			order.MarginCoin = "SUSDT"
 			order.Size = "0.01"
 			order.OrderType = "market"
-			order.StopLoss = fmt.Sprintf("%F", stop_loss)
+			//order.StopLoss = fmt.Sprintf("%F", stop_loss)
 			//order.TakeProfit = fmt.Sprintf("%F", take_profit)
 
 			str, err := NewOrder(api_key, secret_key, passphrase, &order)
@@ -229,12 +241,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 			}
 			res := map[string]string{"client_id": orderResp.Data.ClientOid, "order_id": orderResp.Data.OrderID}
 			log.Println(res)
-			key, err := v.ChangePositions(s.DB, v.OpenLong-1, "long")
-			if err != nil {
-				response.ERROR(w, http.StatusInternalServerError, err)
-				return
-			}
-			log.Println(key)
+
 		}
 	}
 	response.JSON(w, http.StatusOK, "trades made")
