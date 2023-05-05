@@ -45,6 +45,12 @@ type User struct {
 	First_order  float64
 }
 
+type TradeRequest struct {
+	CoinPair   string  `json:"coinPair"`
+	OpenPrice  float64 `json:"openPrice"`
+	ClosePrice float64 `json:"closePrice"`
+}
+
 func (s *Server) Home(w http.ResponseWriter, r *http.Request, email string) {
 	//get keys by user id
 	key := models.Key{}
@@ -165,4 +171,33 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request, email string) {
 	log.Println(short)
 	response.JSON(w, http.StatusOK, user)
 
+}
+
+func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
+	trade_req := &TradeRequest{}
+	err := json.NewDecoder(r.Body).Decode(trade_req)
+	if err != nil {
+		response.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	key := models.Key{}
+	keys, err := key.FindAllKeys(s.DB)
+	if err != nil {
+		response.ERROR(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	user := models.User{}
+	users, err := user.GetAllUsers(s.DB)
+	if err != nil {
+		response.ERROR(w, http.StatusInternalServerError, err)
+		return
+	}
+	fmt.Println(users)
+
+	for _, v := range *keys {
+		fmt.Println(v.Service)
+	}
+	response.JSON(w, http.StatusOK, "trades made")
 }
