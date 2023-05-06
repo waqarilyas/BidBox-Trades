@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	helpers "github.com/ahmed-023/bitget-helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
@@ -46,9 +47,9 @@ type User struct {
 }
 
 type TradeRequest struct {
-	CoinPair   string  `json:"coinPair"`
-	OpenPrice  float64 `json:"openPrice"`
-	ClosePrice float64 `json:"closePrice"`
+	CoinPair   string  `json:"coin_pair"`
+	OpenPrice  float64 `json:"open_value"`
+	ClosePrice float64 `json:"close_value"`
 }
 
 func (s *Server) Home(w http.ResponseWriter, r *http.Request, email string) {
@@ -173,9 +174,30 @@ func (s *Server) Home(w http.ResponseWriter, r *http.Request, email string) {
 
 }
 
+func (t *TradeRequest) Validate() error {
+	if t.ClosePrice == 0 {
+		return errors.New("close price is required")
+	}
+	if t.OpenPrice == 0 {
+		return errors.New("open price is required")
+	}
+	if t.CoinPair == "" {
+		return errors.New("coin pair is required")
+	}
+	return nil
+}
+
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
+
 	trade_req := &TradeRequest{}
 	err := json.NewDecoder(r.Body).Decode(trade_req)
+	if err != nil {
+		response.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+	log.Println(trade_req)
+	err = trade_req.Validate()
 	if err != nil {
 		response.ERROR(w, http.StatusBadRequest, err)
 		return
@@ -200,12 +222,15 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				if v.OpenLong <= 0 {
 					continue
 				}
-				key, err := v.ChangePositions(s.DB, v.OpenLong-1, "long")
-				if err != nil {
-					response.ERROR(w, http.StatusInternalServerError, err)
-					return
-				}
-				log.Println(key)
+				go func() {
+					key, err := v.ChangePositions(s.DB, v.OpenLong-1, "long")
+					if err != nil {
+						response.ERROR(w, http.StatusInternalServerError, err)
+						return
+					}
+					log.Println(key)
+				}()
+
 				order.Side = "open_long"
 			} else {
 				if v.OpenShort <= 0 {
@@ -245,4 +270,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	response.JSON(w, http.StatusOK, "trades made")
+
+	elapsed := time.Since(start)
+	fmt.Printf("Time taken: %s\n", elapsed)
 }
