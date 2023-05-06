@@ -230,18 +230,19 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					}
 					log.Println(key)
 				}()
-
 				order.Side = "open_long"
 			} else {
 				if v.OpenShort <= 0 {
 					continue
 				}
-				key, err := v.ChangePositions(s.DB, v.OpenShort-1, "short")
-				if err != nil {
-					response.ERROR(w, http.StatusInternalServerError, err)
-					return
-				}
-				log.Println(key)
+				go func() {
+					key, err := v.ChangePositions(s.DB, v.OpenShort-1, "short")
+					if err != nil {
+						response.ERROR(w, http.StatusInternalServerError, err)
+						return
+					}
+					log.Println(key)
+				}()
 				order.Side = "open_short"
 			}
 			order.Symbol = trade_req.CoinPair
@@ -250,22 +251,23 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 			order.OrderType = "market"
 			//order.StopLoss = fmt.Sprintf("%F", stop_loss)
 			//order.TakeProfit = fmt.Sprintf("%F", take_profit)
+			go func() {
+				str, err := NewOrder(api_key, secret_key, passphrase, &order)
+				if err != nil {
+					response.ERROR(w, http.StatusInternalServerError, err)
+					return
+				}
 
-			str, err := NewOrder(api_key, secret_key, passphrase, &order)
-			if err != nil {
-				response.ERROR(w, http.StatusInternalServerError, err)
-				return
-			}
+				log.Println(str)
 
-			log.Println(str)
-
-			err = json.Unmarshal([]byte(str), &orderResp)
-			if err != nil {
-				response.ERROR(w, http.StatusBadRequest, err)
-				return
-			}
-			res := map[string]string{"client_id": orderResp.Data.ClientOid, "order_id": orderResp.Data.OrderID}
-			log.Println(res)
+				err = json.Unmarshal([]byte(str), &orderResp)
+				if err != nil {
+					response.ERROR(w, http.StatusBadRequest, err)
+					return
+				}
+				res := map[string]string{"client_id": orderResp.Data.ClientOid, "order_id": orderResp.Data.OrderID}
+				log.Println(res)
+			}()
 
 		}
 	}
