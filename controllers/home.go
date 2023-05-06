@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	helpers "github.com/ahmed-023/bitget-helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
@@ -189,8 +188,9 @@ func (t *TradeRequest) Validate() error {
 }
 
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
-	start := time.Now()
 
+	res := make(map[string]string)
+	ordered := make(chan bool)
 	var loop_wg sync.WaitGroup
 
 	trade_req := &TradeRequest{}
@@ -212,68 +212,78 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	loop_wg.Add(len(keys_list))
 
 	for i, v := range keys_list {
-		//		go func() {
-		api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
-		if v.Service == "bitget" {
-			order := models.OrderRequest{}
-			orderResp := models.OrderResponse{}
-			if trade_req.ClosePrice > trade_req.OpenPrice {
-				if v.OpenLong <= 0 {
-					continue
+		go func(v models.Key, i int) {
+			defer loop_wg.Done()
+
+			api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
+			if v.Service == "bitget" {
+				order := models.OrderRequest{}
+				orderResp := models.OrderResponse{}
+				if trade_req.ClosePrice > trade_req.OpenPrice {
+					if v.OpenLong <= 0 {
+						return
+					}
+					keys_list[i].OpenLong = v.OpenLong - 1
+					go func() {
+						key, err := v.ChangePositions(s.DB, keys_list[i].OpenLong, "long")
+						if err != nil {
+							response.ERROR(w, http.StatusInternalServerError, err)
+							return
+						}
+						log.Println(key)
+					}()
+					order.Side = "open_long"
+				} else {
+					if v.OpenShort <= 0 {
+						return
+					}
+					keys_list[i].OpenShort = v.OpenShort - 1
+					go func() {
+						key, err := v.ChangePositions(s.DB, keys_list[i].OpenShort, "short")
+						if err != nil {
+							response.ERROR(w, http.StatusInternalServerError, err)
+							return
+						}
+						log.Println(key)
+					}()
+					order.Side = "open_short"
 				}
-				keys_list[i].OpenLong = v.OpenLong - 1
+				order.Symbol = trade_req.CoinPair
+				order.MarginCoin = "SUSDT"
+				order.Size = "0.01"
+				order.OrderType = "market"
+				//order.StopLoss = fmt.Sprintf("%F", stop_loss)
+				//order.TakeProfit = fmt.Sprintf("%F", take_profit)
 				go func() {
-					key, err := v.ChangePositions(s.DB, keys_list[i].OpenLong, "long")
+					str, err := NewOrder(api_key, secret_key, passphrase, &order)
 					if err != nil {
 						response.ERROR(w, http.StatusInternalServerError, err)
 						return
 					}
-					log.Println(key)
-				}()
-				order.Side = "open_long"
-			} else {
-				if v.OpenShort <= 0 {
-					continue
-				}
-				keys_list[i].OpenShort = v.OpenShort - 1
-				go func() {
-					key, err := v.ChangePositions(s.DB, keys_list[i].OpenShort, "short")
-					if err != nil {
-						response.ERROR(w, http.StatusInternalServerError, err)
+
+					log.Println(str)
+
+					if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
+						response.ERROR(w, http.StatusBadRequest, err)
 						return
 					}
-					log.Println(key)
+
+					if orderResp.Code != "00000" {
+						response.ERROR(w, http.StatusExpectationFailed, errors.New(orderResp.Msg))
+						return
+					}
+					res["client_id"] = orderResp.Data.ClientOid
+					res["order_id"] = orderResp.Data.OrderID
+					ordered <- true
+					log.Println(res)
 				}()
-				order.Side = "open_short"
 			}
-			order.Symbol = trade_req.CoinPair
-			order.MarginCoin = "SUSDT"
-			order.Size = "0.01"
-			order.OrderType = "market"
-			//order.StopLoss = fmt.Sprintf("%F", stop_loss)
-			//order.TakeProfit = fmt.Sprintf("%F", take_profit)
-			go func() {
-				str, err := NewOrder(api_key, secret_key, passphrase, &order)
-				if err != nil {
-					response.ERROR(w, http.StatusInternalServerError, err)
-					return
-				}
-
-				log.Println(str)
-
-				err = json.Unmarshal([]byte(str), &orderResp)
-				if err != nil {
-					response.ERROR(w, http.StatusBadRequest, err)
-					return
-				}
-				res := map[string]string{"client_id": orderResp.Data.ClientOid, "order_id": orderResp.Data.OrderID}
-				log.Println(res)
-			}()
-		}
-		//		}()
+		}(v, i)
 	}
-	response.JSON(w, http.StatusOK, "trades made")
 
-	elapsed := time.Since(start)
-	fmt.Printf("Time taken: %s\n", elapsed)
+	loop_wg.Wait()
+
+	<-ordered
+	response.JSON(w, http.StatusOK, res)
+
 }
