@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	helpers "github.com/ahmed-023/bitget-helpers"
@@ -190,6 +191,8 @@ func (t *TradeRequest) Validate() error {
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
+	var loop_wg sync.WaitGroup
+
 	trade_req := &TradeRequest{}
 	err := json.NewDecoder(r.Body).Decode(trade_req)
 	if err != nil {
@@ -203,17 +206,13 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	key := models.Key{}
-	keys, err := key.FindAllKeys(s.DB)
-	if err != nil {
-		response.ERROR(w, http.StatusInternalServerError, err)
-		return
-	}
-
 	//	stop_loss := 0.8 * float64(300)
 	//take_profit := 1.1 * float64(300)
 
-	for _, v := range *keys {
+	loop_wg.Add(len(keys_list))
+
+	for i, v := range keys_list {
+		//		go func() {
 		api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
 		if v.Service == "bitget" {
 			order := models.OrderRequest{}
@@ -222,8 +221,9 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				if v.OpenLong <= 0 {
 					continue
 				}
+				keys_list[i].OpenLong = v.OpenLong - 1
 				go func() {
-					key, err := v.ChangePositions(s.DB, v.OpenLong-1, "long")
+					key, err := v.ChangePositions(s.DB, keys_list[i].OpenLong, "long")
 					if err != nil {
 						response.ERROR(w, http.StatusInternalServerError, err)
 						return
@@ -235,8 +235,9 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				if v.OpenShort <= 0 {
 					continue
 				}
+				keys_list[i].OpenShort = v.OpenShort - 1
 				go func() {
-					key, err := v.ChangePositions(s.DB, v.OpenShort-1, "short")
+					key, err := v.ChangePositions(s.DB, keys_list[i].OpenShort, "short")
 					if err != nil {
 						response.ERROR(w, http.StatusInternalServerError, err)
 						return
@@ -268,8 +269,8 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				res := map[string]string{"client_id": orderResp.Data.ClientOid, "order_id": orderResp.Data.OrderID}
 				log.Println(res)
 			}()
-
 		}
+		//		}()
 	}
 	response.JSON(w, http.StatusOK, "trades made")
 

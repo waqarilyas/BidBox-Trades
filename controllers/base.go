@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres" //postgres database driver
+	"github.com/kryptomind/BidBox-Trades/models"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -15,6 +16,8 @@ type Server struct {
 	DB     *gorm.DB
 	Router *mux.Router
 }
+
+var keys_list []models.Key
 
 func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, DbName string) {
 
@@ -31,6 +34,19 @@ func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, D
 	// server.DB.Debug().AutoMigrate(&models.Key{}) //database migration
 	server.Router = mux.NewRouter()
 	server.initializeRoutes()
+	server.InitKeys()
+}
+
+func (server *Server) InitKeys() {
+	key := models.Key{}
+	keys, err := key.FindAllKeys(server.DB)
+	if err != nil {
+		log.Fatal("error getting keys")
+		keys_list = []models.Key{}
+		return
+	}
+	log.Info("retreived keys")
+	keys_list = *keys
 }
 
 func (server *Server) Run(addr string) {
