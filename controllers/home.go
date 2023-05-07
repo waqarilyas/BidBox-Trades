@@ -190,7 +190,6 @@ func (t *TradeRequest) Validate() error {
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 	res := make(map[string]string)
-	ordered := make(chan bool)
 	var loop_wg sync.WaitGroup
 
 	trade_req := &TradeRequest{}
@@ -220,32 +219,8 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				order := models.OrderRequest{}
 				orderResp := models.OrderResponse{}
 				if trade_req.ClosePrice > trade_req.OpenPrice {
-					if v.OpenLong <= 0 {
-						return
-					}
-					keys_list[i].OpenLong = v.OpenLong - 1
-					go func() {
-						key, err := v.ChangePositions(s.DB, keys_list[i].OpenLong, "long")
-						if err != nil {
-							response.ERROR(w, http.StatusInternalServerError, err)
-							return
-						}
-						log.Println(key)
-					}()
 					order.Side = "open_long"
 				} else {
-					if v.OpenShort <= 0 {
-						return
-					}
-					keys_list[i].OpenShort = v.OpenShort - 1
-					go func() {
-						key, err := v.ChangePositions(s.DB, keys_list[i].OpenShort, "short")
-						if err != nil {
-							response.ERROR(w, http.StatusInternalServerError, err)
-							return
-						}
-						log.Println(key)
-					}()
 					order.Side = "open_short"
 				}
 				order.Symbol = trade_req.CoinPair
@@ -272,9 +247,37 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 						response.ERROR(w, http.StatusExpectationFailed, errors.New(orderResp.Msg))
 						return
 					}
+					if order.Side == "open_short" {
+						if v.OpenShort <= 0 {
+							return
+						}
+						keys_list[i].OpenShort = v.OpenShort - 1
+						go func() {
+							key, err := v.ChangePositions(s.DB, keys_list[i].OpenShort, "short")
+							if err != nil {
+								response.ERROR(w, http.StatusInternalServerError, err)
+								return
+							}
+							log.Println(key)
+						}()
+
+					} else if order.Side == "open_long" {
+						if v.OpenLong <= 0 {
+							return
+						}
+						keys_list[i].OpenLong = v.OpenLong - 1
+						go func() {
+							key, err := v.ChangePositions(s.DB, keys_list[i].OpenLong, "long")
+							if err != nil {
+								response.ERROR(w, http.StatusInternalServerError, err)
+								return
+							}
+							log.Println(key)
+						}()
+
+					}
 					res["client_id"] = orderResp.Data.ClientOid
 					res["order_id"] = orderResp.Data.OrderID
-					ordered <- true
 					log.Println(res)
 				}()
 			}
@@ -283,7 +286,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 	loop_wg.Wait()
 
-	<-ordered
 	response.JSON(w, http.StatusOK, res)
 
 }
