@@ -2,21 +2,23 @@ package models
 
 import (
 	"errors"
+	"math"
 
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
 )
 
 type Key struct {
-	Keyid      uuid.UUID `gorm:"primary_key;type:uuid;default:gen_random_uuid()" json:"key_id"`
-	Uid        string    `gorm:"size:255" json:"uid"`
-	Service    string    `gorm:"size:255;not null" json:"service"`
-	ApiKey     string    `gorm:"not null;unique" json:"api_key"`
-	SecretKey  string    `gorm:"not null;unique" json:"secret_key"`
-	Passphrase string    `gorm:"" json:"passphrase"`
-	UserEmail  string    `json:"user_email"`
-	OpenShort  int
-	OpenLong   int
+	Keyid       uuid.UUID `gorm:"primary_key;type:uuid;default:gen_random_uuid()" json:"key_id"`
+	Uid         string    `gorm:"size:255" json:"uid"`
+	Service     string    `gorm:"size:255;not null" json:"service"`
+	ApiKey      string    `gorm:"not null;unique" json:"api_key"`
+	SecretKey   string    `gorm:"not null;unique" json:"secret_key"`
+	Passphrase  string    `gorm:"" json:"passphrase"`
+	UserEmail   string    `json:"user_email"`
+	OpenShort   int
+	OpenLong    int
+	TradeAmount int
 }
 
 func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
@@ -72,13 +74,13 @@ func (u *Key) FindKeyByUserIdAndShort(db *gorm.DB, uid uuid.UUID, service string
 
 func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, error) {
 	if pos_type == "short" {
-		db = db.Debug().Model(&Key{}).Where("user_email = ?", u.UserEmail).Take(&Key{}).UpdateColumns(
+		db = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 			map[string]interface{}{
 				"open_short": pos,
 			},
 		)
 	} else {
-		db = db.Debug().Model(&Key{}).Where("user_email = ?", u.UserEmail).Take(&Key{}).UpdateColumns(
+		db = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 			map[string]interface{}{
 				"open_long": pos,
 			},
@@ -89,7 +91,43 @@ func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, erro
 		return &Key{}, db.Error
 	}
 	// This is the display the updated user
-	err := db.Debug().Model(&Key{}).Where("user_email = ?", u.UserEmail).Take(&u).Error
+	err := db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&u).Error
+	if err != nil {
+		return &Key{}, err
+	}
+	return u, nil
+}
+
+func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
+	conds := Conditions{}
+	cond, err := conds.FindKeyById(db, int(math.Floor(float64(trade_amount/100))*100))
+
+	if err != nil {
+		return &Key{}, err
+	}
+
+	long := 0
+	short := 0
+	for i := 0; i < cond.Positions; i++ {
+		if i%2 == 0 {
+			long++
+		} else {
+			short++
+		}
+	}
+
+	db = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
+		map[string]interface{}{
+			"trade_amount": trade_amount,
+			"open_short":   short,
+			"open_long":    long,
+		},
+	)
+	if db.Error != nil {
+		return &Key{}, db.Error
+	}
+	// This is the display the updated user
+	err = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&u).Error
 	if err != nil {
 		return &Key{}, err
 	}

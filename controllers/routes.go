@@ -9,4 +9,5 @@ func (r *Server) initializeRoutes() {
 	s.HandleFunc("/", middleware.MiddlewareJSON(r.StartTrade)).Methods("POST")
 	s.HandleFunc("/order", middleware.ValidateEmail(r.PlaceOrder)).Methods("POST")
 
+	s.HandleFunc("/amount", middleware.ValidateEmail(r.UpdateAmount)).Methods("POST")
 }

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 
 	helpers "github.com/ahmed-023/bitget-helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
@@ -187,10 +186,58 @@ func (t *TradeRequest) Validate() error {
 	return nil
 }
 
+func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email string) {
+
+	service := r.URL.Query().Get("service")
+	if service == "" {
+		response.ERROR(w, http.StatusBadRequest, errors.New("service required"))
+		return
+	}
+
+	if service != "bitget" {
+		response.ERROR(w, http.StatusBadRequest, errors.New("service not supported"))
+		return
+	}
+
+	key := models.Key{}
+	key.Service = service
+	key.UserEmail = email
+
+	var data map[string]int
+
+	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		response.ERROR(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	if data["trade_amount"] == 0 {
+		response.ERROR(w, http.StatusBadRequest, errors.New("trade amount is required"))
+		return
+	}
+
+	keys, err := key.ChangeTradeAmount(s.DB, data["trade_amount"])
+	if err != nil {
+		response.ERROR(w, http.StatusInternalServerError, err)
+		return
+	}
+
+	go func() {
+		new_keys, err := key.FindAllKeys(s.DB)
+		if err != nil {
+			log.Fatal("error getting keys")
+			keys_list = []models.Key{}
+			return
+		}
+		log.Info("retreived keys")
+		keys_list = *new_keys
+	}()
+
+	response.JSON(w, http.StatusOK, keys)
+}
+
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 	res := make(map[string]string)
-	var loop_wg sync.WaitGroup
 
 	trade_req := &TradeRequest{}
 	err := json.NewDecoder(r.Body).Decode(trade_req)
@@ -208,19 +255,21 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	//	stop_loss := 0.8 * float64(300)
 	//take_profit := 1.1 * float64(300)
 
-	loop_wg.Add(len(keys_list))
-
 	for i, v := range keys_list {
 		go func(v models.Key, i int) {
-			defer loop_wg.Done()
-
 			api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
 			if v.Service == "bitget" {
 				order := models.OrderRequest{}
 				orderResp := models.OrderResponse{}
 				if trade_req.ClosePrice > trade_req.OpenPrice {
+					if v.OpenLong <= 0 {
+						return
+					}
 					order.Side = "open_long"
 				} else {
+					if v.OpenShort <= 0 {
+						return
+					}
 					order.Side = "open_short"
 				}
 				order.Symbol = trade_req.CoinPair
@@ -283,8 +332,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 			}
 		}(v, i)
 	}
-
-	loop_wg.Wait()
 
 	response.JSON(w, http.StatusOK, res)
 
