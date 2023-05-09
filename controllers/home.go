@@ -48,11 +48,13 @@ type TradeRequest struct {
 	ClosePrice float64 `json:"close_value"`
 }
 
-type UpdatePos struct {
-}
-
-func handleUpdate() {
-
+func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
+	key, err := key.ChangePositions(s.DB, val, pos)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	log.Println(key)
 }
 
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
@@ -132,26 +134,10 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					}
 					if order.Side == "open_short" {
 						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
-						go func() {
-							key, err := v.ChangePositions(s.DB, app_data.Keys_list[i].OpenShort, "short")
-							if err != nil {
-								response.ERROR(w, http.StatusInternalServerError, err)
-								return
-							}
-							log.Println(key)
-						}()
-
+						go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
 					} else if order.Side == "open_long" {
 						app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-						go func() {
-							key, err := v.ChangePositions(s.DB, app_data.Keys_list[i].OpenLong, "long")
-							if err != nil {
-								response.ERROR(w, http.StatusInternalServerError, err)
-								return
-							}
-							log.Println(key)
-						}()
-
+						go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
 					}
 					res["client_id"] = orderResp.Data.ClientOid
 					res["order_id"] = orderResp.Data.OrderID

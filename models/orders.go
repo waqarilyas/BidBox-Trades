@@ -68,7 +68,7 @@ func (o *OrderRequest) Validate() error {
 }
 
 func (o *Order) SaveOrder(db *gorm.DB) (*Order, error) {
-	err := db.Debug().Create(&o).Error
+	err := db.Create(&o).Error
 	if err != nil {
 		return &Order{}, err
 	}

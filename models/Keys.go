@@ -23,7 +23,7 @@ type Key struct {
 
 func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
 	Keys := []Key{}
-	err := db.Debug().Model(&Key{}).Limit(100).Find(&Keys).Error
+	err := db.Model(&Key{}).Limit(100).Find(&Keys).Error
 	if err != nil {
 		return &[]Key{}, err
 	}
@@ -31,7 +31,7 @@ func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
 }
 
 func (u *Key) FindKeyById(db *gorm.DB, kid uuid.UUID) (*Key, error) {
-	err := db.Debug().Model(Key{}).Where("keyid = ?", kid).Take(&u).Error
+	err := db.Model(Key{}).Where("keyid = ?", kid).Take(&u).Error
 	if err != nil {
 		return &Key{}, err
 	}
@@ -43,7 +43,7 @@ func (u *Key) FindKeyById(db *gorm.DB, kid uuid.UUID) (*Key, error) {
 
 func (u *Key) FindKeysByEmail(db *gorm.DB, email string) (*[]Key, error) {
 	Keys := []Key{}
-	err := db.Debug().Model(Key{}).Where("user_email = ?", email).Find(&Keys).Error
+	err := db.Model(Key{}).Where("user_email = ?", email).Find(&Keys).Error
 	if err != nil {
 		return &[]Key{}, err
 	}
@@ -52,7 +52,7 @@ func (u *Key) FindKeysByEmail(db *gorm.DB, email string) (*[]Key, error) {
 
 func (u *Key) FindKeysByUserId(db *gorm.DB, uid uuid.UUID) (*[]Key, error) {
 	Keys := []Key{}
-	err := db.Debug().Model(Key{}).Where("uid = ?", uid).Find(&Keys).Error
+	err := db.Model(Key{}).Where("uid = ?", uid).Find(&Keys).Error
 	if err != nil {
 		return &[]Key{}, err
 	}
@@ -61,7 +61,7 @@ func (u *Key) FindKeysByUserId(db *gorm.DB, uid uuid.UUID) (*[]Key, error) {
 
 func (u *Key) FindKeyByUserIdAndShort(db *gorm.DB, uid uuid.UUID, service string) (*Key, error) {
 	Keys := Key{}
-	err := db.Debug().Model(Key{}).Where("uid = ? AND service = ? ", uid, service).Find(&Keys).Error
+	err := db.Model(Key{}).Where("uid = ? AND service = ? ", uid, service).Find(&Keys).Error
 	if err != nil {
 		return &Key{}, err
 	}
@@ -74,24 +74,26 @@ func (u *Key) FindKeyByUserIdAndShort(db *gorm.DB, uid uuid.UUID, service string
 
 func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, error) {
 	if pos_type == "short" {
-		db = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
+		db = db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 			map[string]interface{}{
 				"open_short": pos,
 			},
 		)
+		u.OpenShort = pos
 	} else {
-		db = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
+		db = db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 			map[string]interface{}{
 				"open_long": pos,
 			},
 		)
+		u.OpenLong = pos
 	}
 
 	if db.Error != nil {
 		return &Key{}, db.Error
 	}
 	// This is the display the updated user
-	err := db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&u).Error
+	err := db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&u).Error
 	if err != nil {
 		return &Key{}, err
 	}
@@ -116,7 +118,7 @@ func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
 		}
 	}
 
-	db = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
+	db = db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 		map[string]interface{}{
 			"trade_amount": trade_amount,
 			"open_short":   short,
@@ -127,7 +129,7 @@ func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
 		return &Key{}, db.Error
 	}
 	// This is the display the updated user
-	err = db.Debug().Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&u).Error
+	err = db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&u).Error
 	if err != nil {
 		return &Key{}, err
 	}

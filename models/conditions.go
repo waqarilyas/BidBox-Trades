@@ -15,7 +15,7 @@ type Conditions struct {
 
 func (u *Conditions) FindAllConditions(db *gorm.DB) (*[]Conditions, error) {
 	conditions := []Conditions{}
-	err := db.Debug().Model(Conditions{}).Limit(100).Take(conditions).Error
+	err := db.Model(Conditions{}).Limit(100).Take(conditions).Error
 	if err != nil {
 		return &[]Conditions{}, err
 	}
@@ -23,7 +23,7 @@ func (u *Conditions) FindAllConditions(db *gorm.DB) (*[]Conditions, error) {
 }
 
 func (u *Conditions) FindCondition(db *gorm.DB, capital int) (*Conditions, error) {
-	err := db.Debug().Model(Conditions{}).Where("capital = ?", capital).Take(&u).Error
+	err := db.Model(Conditions{}).Where("capital = ?", capital).Take(&u).Error
 	if err != nil {
 		return &Conditions{}, err
 	}
