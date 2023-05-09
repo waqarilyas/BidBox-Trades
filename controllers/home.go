@@ -112,8 +112,10 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				order.Size = fmt.Sprintf("%f", size)
 				log.Println(order.Size)
 				order.OrderType = "market"
-				//order.StopLoss = fmt.Sprintf("%F", stop_loss)
-				//order.TakeProfit = fmt.Sprintf("%F", take_profit)
+				// order.StopLoss = fmt.Sprintf("%F", (size * 0.8))
+				// fmt.Println(order.StopLoss)
+				// order.TakeProfit = fmt.Sprintf("%F", (size * 1.1))
+				// fmt.Println(order.TakeProfit)
 				go func() {
 					str, err := NewOrder(api_key, secret_key, passphrase, &order)
 					if err != nil {
