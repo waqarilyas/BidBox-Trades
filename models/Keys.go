@@ -100,7 +100,7 @@ func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, erro
 
 func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
 	conds := Conditions{}
-	cond, err := conds.FindKeyById(db, int(math.Floor(float64(trade_amount/100))*100))
+	cond, err := conds.FindCondition(db, int(math.Floor(float64(trade_amount/100))*100))
 
 	if err != nil {
 		return &Key{}, err

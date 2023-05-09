@@ -13,8 +13,17 @@ type Conditions struct {
 	StopLoss  int
 }
 
-func (u *Conditions) FindKeyById(db *gorm.DB, capital int) (*Conditions, error) {
-	err := db.Debug().Model(Key{}).Where("capital = ?", capital).Take(&u).Error
+func (u *Conditions) FindAllConditions(db *gorm.DB) (*[]Conditions, error) {
+	conditions := []Conditions{}
+	err := db.Debug().Model(Conditions{}).Limit(100).Take(conditions).Error
+	if err != nil {
+		return &[]Conditions{}, err
+	}
+	return &conditions, nil
+}
+
+func (u *Conditions) FindCondition(db *gorm.DB, capital int) (*Conditions, error) {
+	err := db.Debug().Model(Conditions{}).Where("capital = ?", capital).Take(&u).Error
 	if err != nil {
 		return &Conditions{}, err
 	}

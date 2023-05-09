@@ -17,7 +17,12 @@ type Server struct {
 	Router *mux.Router
 }
 
-var keys_list []models.Key
+type AppData struct {
+	Keys_list  []models.Key
+	Conditions []models.Conditions
+}
+
+var app_data AppData
 
 func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, DbName string) {
 
@@ -35,6 +40,7 @@ func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, D
 	server.Router = mux.NewRouter()
 	server.initializeRoutes()
 	server.InitKeys()
+	//server.InitConditions()
 }
 
 func (server *Server) InitKeys() {
@@ -42,11 +48,24 @@ func (server *Server) InitKeys() {
 	keys, err := key.FindAllKeys(server.DB)
 	if err != nil {
 		log.Fatal("error getting keys")
-		keys_list = []models.Key{}
+		app_data.Keys_list = []models.Key{}
 		return
 	}
 	log.Info("retreived keys")
-	keys_list = *keys
+	app_data.Keys_list = *keys
+}
+
+func (server *Server) InitConditions() {
+	cond := models.Conditions{}
+	conds, err := cond.FindAllConditions(server.DB)
+	if err != nil {
+		log.Fatal("error getting keys")
+		app_data.Conditions = []models.Conditions{}
+		return
+	}
+	log.Info("retreived conditions")
+	app_data.Conditions = *conds
+
 }
 
 func (server *Server) Run(addr string) {
