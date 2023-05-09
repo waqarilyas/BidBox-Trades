@@ -48,6 +48,123 @@ type TradeRequest struct {
 	ClosePrice float64 `json:"close_value"`
 }
 
+type UpdatePos struct {
+}
+
+func handleUpdate() {
+
+}
+
+func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
+
+	res := make(map[string]string)
+
+	trade_req := &TradeRequest{}
+	err := json.NewDecoder(r.Body).Decode(trade_req)
+	if err != nil {
+		response.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+	log.Println(trade_req)
+	err = trade_req.Validate()
+	if err != nil {
+		response.ERROR(w, http.StatusBadRequest, err)
+		return
+	}
+
+	//	stop_loss := 0.8 * float64(300)
+	//take_profit := 1.1 * float64(300)
+	for i, v := range app_data.Keys_list {
+
+		go func(v models.Key, i int) {
+			if v.Service == "bitget" {
+				api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
+				order := models.OrderRequest{}
+				orderResp := models.OrderResponse{}
+				if trade_req.ClosePrice > trade_req.OpenPrice {
+					if v.OpenLong <= 0 {
+						return
+					}
+					order.Side = "open_long"
+				} else {
+					if v.OpenShort <= 0 {
+						return
+					}
+					order.Side = "open_short"
+				}
+				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
+				cond := models.Conditions{}
+				c, err := cond.FindCondition(s.DB, val)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
+				order.Symbol = trade_req.CoinPair
+				order.MarginCoin = "SUSDT"
+				size, err := GetSize(order.Symbol, first_order)
+				if err != nil {
+					log.Fatal(err)
+					return
+				}
+				order.Size = fmt.Sprintf("%f", size)
+				log.Println(order.Size)
+				order.OrderType = "market"
+				//order.StopLoss = fmt.Sprintf("%F", stop_loss)
+				//order.TakeProfit = fmt.Sprintf("%F", take_profit)
+				go func() {
+					str, err := NewOrder(api_key, secret_key, passphrase, &order)
+					if err != nil {
+						response.ERROR(w, http.StatusInternalServerError, err)
+						return
+					}
+
+					log.Println(str)
+
+					if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
+						response.ERROR(w, http.StatusBadRequest, err)
+						return
+					}
+
+					if orderResp.Code != "00000" {
+						response.ERROR(w, http.StatusExpectationFailed, errors.New(orderResp.Msg))
+						return
+					}
+					if order.Side == "open_short" {
+						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
+						go func() {
+							key, err := v.ChangePositions(s.DB, app_data.Keys_list[i].OpenShort, "short")
+							if err != nil {
+								response.ERROR(w, http.StatusInternalServerError, err)
+								return
+							}
+							log.Println(key)
+						}()
+
+					} else if order.Side == "open_long" {
+						app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+						go func() {
+							key, err := v.ChangePositions(s.DB, app_data.Keys_list[i].OpenLong, "long")
+							if err != nil {
+								response.ERROR(w, http.StatusInternalServerError, err)
+								return
+							}
+							log.Println(key)
+						}()
+
+					}
+					res["client_id"] = orderResp.Data.ClientOid
+					res["order_id"] = orderResp.Data.OrderID
+					log.Println(res)
+				}()
+			}
+		}(v, i)
+	}
+
+	response.JSON(w, http.StatusOK, "trades made")
+
+}
+
 func (t *TradeRequest) Validate() error {
 	if t.ClosePrice == 0 {
 		return errors.New("close price is required")
@@ -108,115 +225,4 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 	}()
 
 	response.JSON(w, http.StatusOK, keys)
-}
-
-func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
-
-	res := make(map[string]string)
-
-	trade_req := &TradeRequest{}
-	err := json.NewDecoder(r.Body).Decode(trade_req)
-	if err != nil {
-		response.ERROR(w, http.StatusBadRequest, err)
-		return
-	}
-	log.Println(trade_req)
-	err = trade_req.Validate()
-	if err != nil {
-		response.ERROR(w, http.StatusBadRequest, err)
-		return
-	}
-
-	//	stop_loss := 0.8 * float64(300)
-	//take_profit := 1.1 * float64(300)
-	for i, v := range app_data.Keys_list {
-
-		go func(v models.Key, i int) {
-			api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
-			if v.Service == "bitget" {
-				order := models.OrderRequest{}
-				orderResp := models.OrderResponse{}
-				if trade_req.ClosePrice > trade_req.OpenPrice {
-					if v.OpenLong <= 0 {
-						return
-					}
-					order.Side = "open_long"
-				} else {
-					if v.OpenShort <= 0 {
-						return
-					}
-					order.Side = "open_short"
-				}
-				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
-				cond := models.Conditions{}
-				c, err := cond.FindCondition(s.DB, val)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
-				order.Symbol = trade_req.CoinPair
-				order.MarginCoin = "SUSDT"
-				order.Size = fmt.Sprintf("%.2f", first_order)
-				log.Println(order.Size)
-				order.OrderType = "market"
-				//order.StopLoss = fmt.Sprintf("%F", stop_loss)
-				//order.TakeProfit = fmt.Sprintf("%F", take_profit)
-				go func() {
-					str, err := NewOrder(api_key, secret_key, passphrase, &order)
-					if err != nil {
-						response.ERROR(w, http.StatusInternalServerError, err)
-						return
-					}
-
-					log.Println(str)
-
-					if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
-						response.ERROR(w, http.StatusBadRequest, err)
-						return
-					}
-
-					if orderResp.Code != "00000" {
-						response.ERROR(w, http.StatusExpectationFailed, errors.New(orderResp.Msg))
-						return
-					}
-					if order.Side == "open_short" {
-						if v.OpenShort <= 0 {
-							return
-						}
-						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
-						go func() {
-							key, err := v.ChangePositions(s.DB, app_data.Keys_list[i].OpenShort, "short")
-							if err != nil {
-								response.ERROR(w, http.StatusInternalServerError, err)
-								return
-							}
-							log.Println(key)
-						}()
-
-					} else if order.Side == "open_long" {
-						if v.OpenLong <= 0 {
-							return
-						}
-						app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-						go func() {
-							key, err := v.ChangePositions(s.DB, app_data.Keys_list[i].OpenLong, "long")
-							if err != nil {
-								response.ERROR(w, http.StatusInternalServerError, err)
-								return
-							}
-							log.Println(key)
-						}()
-
-					}
-					res["client_id"] = orderResp.Data.ClientOid
-					res["order_id"] = orderResp.Data.OrderID
-					log.Println(res)
-				}()
-			}
-		}(v, i)
-	}
-
-	response.JSON(w, http.StatusOK, "trades made")
-
 }
