@@ -195,6 +195,11 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 		return
 	}
 
+	if err := utils.CheckBalance(data["trade_amount"]); err != nil {
+		response.ERROR(w, http.StatusBadRequest, errors.New("minimum amount must be 200"))
+		return
+	}
+
 	keys, err := key.ChangeTradeAmount(s.DB, data["trade_amount"])
 	if err != nil {
 		response.ERROR(w, http.StatusInternalServerError, err)

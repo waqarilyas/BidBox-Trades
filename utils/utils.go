@@ -63,7 +63,7 @@ func AiStub(orders int) ([]string, []string, error) {
 	return list[middle:], list[:middle], nil
 }
 
-func CheckBalance(val float64) error {
+func CheckBalance(val int) error {
 	if val < 200 {
 		return errors.New("Balance should be at least 200 USDT")
 	}
