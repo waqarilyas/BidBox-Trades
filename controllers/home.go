@@ -104,7 +104,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
 				order.Symbol = trade_req.CoinPair
 				order.MarginCoin = "SUSDT"
-				size, err := GetSize(order.Symbol, first_order)
+				size, err := utils.GetSize(order.Symbol, first_order)
 				if err != nil {
 					log.Fatal(err)
 					return

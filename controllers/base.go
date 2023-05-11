@@ -1,11 +1,8 @@
 package controllers
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
@@ -44,45 +41,6 @@ func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, D
 	server.initializeRoutes()
 	server.InitKeys()
 	//server.InitConditions()
-}
-
-type IndexPriceReq struct {
-	Code string `json:"code"`
-	Data struct {
-		Symbol    string `json:"symbol"`
-		Index     string `json:"index"`
-		Timestamp string `json:"timestamp"`
-	} `json:"data"`
-	Msg         string `json:"msg"`
-	RequestTime int64  `json:"requestTime"`
-}
-
-func GetSize(symbol string, first_order float64) (float64, error) {
-	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
-
-	client := http.Client{}
-
-	res, err := client.Get(url)
-	if err != nil {
-		return 0, err
-	}
-	defer res.Body.Close()
-
-	price := IndexPriceReq{}
-	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
-		return 0, err
-	}
-
-	if price.Code != "00000" {
-		return 0, errors.New(price.Msg)
-	}
-
-	fprice, err := strconv.ParseFloat(price.Data.Index, 64)
-	if err != nil {
-		return 0, err
-	}
-
-	return first_order / fprice, nil
 }
 
 func (server *Server) InitKeys() {

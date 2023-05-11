@@ -15,6 +15,17 @@ var server = controllers.Server{}
 func Run() {
 	err := godotenv.Load()
 	log := logrus.New()
+	// file, err := os.OpenFile("output.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// // Create a multi-writer that writes to both the file and stdout
+	// writer := io.MultiWriter(os.Stdout, file)
+
+	// // Set the log output to the multi-writer
+	// log.SetOutput(writer)
+
 	log.SetFormatter(&nested.Formatter{
 		HideKeys:    true,
 		FieldsOrder: []string{"file", "function"},

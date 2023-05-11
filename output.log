@@ -1,0 +1,11 @@
+time="2023-05-11T12:38:33+05:00" level=info msg="Connected to the %s databasepostgres"
+time="2023-05-11T12:38:33+05:00" level=info msg="retreived keys"
+time="2023-05-11T12:38:55+05:00" level=info msg="Connected to the %s databasepostgres"
+time="2023-05-11T12:38:55+05:00" level=info msg="retreived keys"
+time="2023-05-11T12:38:55+05:00" level=info msg="Listening on port 8080"
+time="2023-05-11T12:41:15+05:00" level=info msg="Connected to the %s databasepostgres"
+time="2023-05-11T12:41:16+05:00" level=info msg="retreived keys"
+time="2023-05-11T12:41:16+05:00" level=info msg="Listening on port 8080"
+May 11 12:52:06.015[36m [INFO] [main.go] [Run] [0mGetting Values
+May 11 12:52:52.167[36m [INFO] [main.go] [Run] [0mGetting Values
+May 11 12:58:32.021[36m [INFO] [main.go] [Run] [0mGetting Values
