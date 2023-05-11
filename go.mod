@@ -17,6 +17,7 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/google/uuid v1.3.0
+	github.com/gorilla/websocket v1.5.0
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/leodido/go-urn v1.2.2 // indirect
 	github.com/lib/pq v1.1.1 // indirect

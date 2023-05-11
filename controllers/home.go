@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"sync"
 
+	"github.com/gorilla/websocket"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
@@ -57,99 +59,219 @@ func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
 	log.Println(key)
 }
 
+// We'll need to define an Upgrader
+// this will require a Read and Write buffer size
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
+func wsEndpoint(w http.ResponseWriter, r *http.Request) {
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+
+	// upgrade this connection to a WebSocket
+	// connection
+	ws, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+	}
+	// helpful log statement to show connections
+	log.Println("Client Connected")
+	err = ws.WriteMessage(1, []byte("Hi Client!"))
+	if err != nil {
+		log.Println(err)
+	}
+
+	reader(ws)
+}
+
+// define a reader which will listen for
+// new messages being sent to our WebSocket
+// endpoint
+func reader(conn *websocket.Conn) {
+	for {
+		// read in a message
+		_, p, err := conn.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		trade_req := &TradeRequest{}
+		if err := json.Unmarshal(p, &trade_req); err != nil {
+			conn.WriteMessage(websocket.TextMessage, []byte(err.Error()))
+			continue
+		}
+
+		err = trade_req.Validate()
+		if err != nil {
+			conn.WriteMessage(websocket.TextMessage, []byte(err.Error()))
+			continue
+		}
+
+		// print out that message for clarity
+		fmt.Println(string(p))
+
+		if err := conn.WriteMessage(websocket.TextMessage, p); err != nil {
+			log.Println(err)
+			return
+		}
+
+	}
+}
+
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 	res := make(map[string]string)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	sides := make([]string, len(app_data.Keys_list))
 
-	trade_req := &TradeRequest{}
-	err := json.NewDecoder(r.Body).Decode(trade_req)
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+
+	// upgrade this connection to a WebSocket
+	// connection
+	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		response.ERROR(w, http.StatusBadRequest, err)
-		return
+		log.Println(err)
 	}
-	log.Println(trade_req)
-	err = trade_req.Validate()
+	// helpful log statement to show connections
+	log.Println("Client Connected")
+	err = ws.WriteMessage(1, []byte("Hi Client!"))
 	if err != nil {
-		response.ERROR(w, http.StatusBadRequest, err)
-		return
+		log.Println(err)
 	}
 
-	//	stop_loss := 0.8 * float64(300)
-	//take_profit := 1.1 * float64(300)
-	for i, v := range app_data.Keys_list {
+	for {
+		// read in a message
+		_, p, err := ws.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
-		go func(v models.Key, i int) {
-			if v.Service == "bitget" {
-				api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
-				order := models.OrderRequest{}
-				orderResp := models.OrderResponse{}
-				if trade_req.ClosePrice > trade_req.OpenPrice {
-					if v.OpenLong <= 0 {
+		trade_req := &TradeRequest{}
+		if err := json.Unmarshal(p, &trade_req); err != nil {
+			ws.WriteMessage(websocket.TextMessage, []byte(err.Error()))
+			continue
+		}
+
+		err = trade_req.Validate()
+		if err != nil {
+			ws.WriteMessage(websocket.TextMessage, []byte(err.Error()))
+			continue
+		}
+
+		// print out that message for clarity
+		fmt.Println(string(p))
+
+		if err := ws.WriteMessage(websocket.TextMessage, p); err != nil {
+			log.Println(err)
+			return
+		}
+
+		//go func() {
+		//	stop_loss := 0.8 * float64(300)
+		//take_profit := 1.1 * float64(300)
+		wg.Add(len(app_data.Keys_list))
+		for i, v := range app_data.Keys_list {
+
+			go func(v models.Key, i int) {
+
+				defer wg.Done()
+				if v.Service == "bitget" {
+					api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
+					order := models.OrderRequest{}
+					orderResp := models.OrderResponse{}
+					if trade_req.ClosePrice > trade_req.OpenPrice {
+						if v.OpenLong <= 0 {
+							return
+						}
+						order.Side = "open_long"
+					} else {
+						if v.OpenShort <= 0 {
+							return
+						}
+						order.Side = "open_short"
+					}
+					val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
+					cond := models.Conditions{}
+					c, err := cond.FindCondition(s.DB, val)
+					if err != nil {
+						log.Fatal(err)
 						return
 					}
-					order.Side = "open_long"
-				} else {
-					if v.OpenShort <= 0 {
+					first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
+					order.Symbol = trade_req.CoinPair
+					order.MarginCoin = "SUSDT"
+					size, err := GetSize(order.Symbol, first_order)
+					if err != nil {
+						log.Fatal(err)
 						return
 					}
-					order.Side = "open_short"
-				}
-				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
-				cond := models.Conditions{}
-				c, err := cond.FindCondition(s.DB, val)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
-				order.Symbol = trade_req.CoinPair
-				order.MarginCoin = "SUSDT"
-				size, err := GetSize(order.Symbol, first_order)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-				order.Size = fmt.Sprintf("%f", size)
-				log.Println(order.Size)
-				order.OrderType = "market"
-				// order.StopLoss = fmt.Sprintf("%F", (size * 0.8))
-				// fmt.Println(order.StopLoss)
-				// order.TakeProfit = fmt.Sprintf("%F", (size * 1.1))
-				// fmt.Println(order.TakeProfit)
-				go func() {
+					order.Size = fmt.Sprintf("%f", size)
+					log.Println(order.Size)
+					order.OrderType = "market"
+					// order.StopLoss = fmt.Sprintf("%F", (size * 0.8))
+					// fmt.Println(order.StopLoss)
+					// order.TakeProfit = fmt.Sprintf("%F", (size * 1.1))
+					// fmt.Println(order.TakeProfit)
+					//				go func() {
 					str, err := NewOrder(api_key, secret_key, passphrase, &order)
 					if err != nil {
-						response.ERROR(w, http.StatusInternalServerError, err)
+						ws.WriteMessage(websocket.TextMessage, []byte(err.Error()))
 						return
 					}
 
 					log.Println(str)
 
 					if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
-						response.ERROR(w, http.StatusBadRequest, err)
+						ws.WriteMessage(websocket.TextMessage, []byte(err.Error()))
 						return
 					}
 
 					if orderResp.Code != "00000" {
-						response.ERROR(w, http.StatusExpectationFailed, errors.New(orderResp.Msg))
+						ws.WriteMessage(websocket.TextMessage, []byte(err.Error()))
 						return
 					}
 					if order.Side == "open_short" {
+						sides[i] = "short"
 						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
-						go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
 					} else if order.Side == "open_long" {
+						sides[i] = "long"
 						app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-						go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
 					}
 					res["client_id"] = orderResp.Data.ClientOid
 					res["order_id"] = orderResp.Data.OrderID
 					log.Println(res)
-				}()
-			}
-		}(v, i)
-	}
+					b, err := json.Marshal(res)
+					if err != nil {
+						log.Fatal(err)
+						return
+					}
+					mu.Lock()
+					ws.WriteMessage(websocket.TextMessage, b)
+					mu.Unlock()
+					//				}()
+				}
+			}(v, i)
+		}
 
-	response.JSON(w, http.StatusOK, "trades made")
+		wg.Wait()
+
+		for i, k := range app_data.Keys_list {
+			go func(k models.Key, i int) {
+				if sides[i] == "long" {
+					fmt.Println(app_data.Keys_list[i].OpenLong)
+					s.handleUpdate(&k, app_data.Keys_list[i].OpenLong, sides[i])
+				} else {
+					fmt.Println(app_data.Keys_list[i].OpenShort)
+					s.handleUpdate(&k, app_data.Keys_list[i].OpenShort, sides[i])
+				}
+			}(k, i)
+		}
+		//	}()
+	}
 
 }
 
