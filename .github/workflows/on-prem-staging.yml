@@ -19,11 +19,19 @@ jobs:
         uses: actions/checkout@v2
         with:
           clean: False
+      
       - name: Make environment files
         run: |
-          cat << EOF > .env
+            cat << EOF > .env
             API_SECRET=${{ secrets.API_SECRET }}
-          
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_DRIVER=${{ secrets.DB_DRIVER }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            ENCRYPTION_PASS=${{ secrets.ENCRYPTION_PASS }}
+      
       - name: Building and Assigning Tag to image
         run: |
           docker build -t $IMAGE_NAME_TAG .
