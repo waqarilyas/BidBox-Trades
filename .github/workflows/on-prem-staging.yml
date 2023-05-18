@@ -11,6 +11,8 @@ jobs:
     env:
       CONTAINER_NAME: bidbox-trades-service
       IMAGE_NAME_TAG: bidbox-trades:latest
+      HOST_PORT: 8003
+      CONTAINER_PORT: 8080
 
     steps:
       - name: Checkout
@@ -32,7 +34,7 @@ jobs:
       
       - name: Starting Docker Container
         run: |
-          docker run -d -p 8000:8080 --restart unless-stopped --name $CONTAINER_NAME  $IMAGE_NAME_TAG
+          docker run -d -p $HOST_PORT:$CONTAINER_PORT --restart unless-stopped --name $CONTAINER_NAME  $IMAGE_NAME_TAG
       
       - name: View Docker status
         run: |
