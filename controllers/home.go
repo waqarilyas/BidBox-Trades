@@ -57,6 +57,10 @@ func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
 	log.Println(key)
 }
 
+func (server *Server) Home(w http.ResponseWriter, r *http.Request) {
+	response.JSON(w, http.StatusOK, "Trade Service")
+}
+
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 	res := make(map[string]string)
