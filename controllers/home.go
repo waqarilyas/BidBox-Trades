@@ -127,8 +127,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 
-					log.Println(str)
-
 					if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
 						response.ERROR(w, http.StatusBadRequest, err)
 						return
@@ -138,6 +136,17 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 						response.ERROR(w, http.StatusExpectationFailed, errors.New(orderResp.Msg))
 						return
 					}
+					new_order := models.Order{
+						Email:      v.UserEmail,
+						Symbol:     order.Symbol,
+						Size:       order.Size,
+						Side:       order.Side,
+						MarginCoin: order.MarginCoin,
+						OrderType:  order.OrderType,
+						OrderID:    orderResp.Data.OrderID,
+						ClientID:   orderResp.Data.ClientOid,
+					}
+					new_order.SaveOrder(s.DB)
 					if order.Side == "open_short" {
 						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
 						go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
