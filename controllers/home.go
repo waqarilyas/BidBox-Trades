@@ -43,9 +43,7 @@ type User struct {
 }
 
 type TradeRequest struct {
-	CoinPair   string  `json:"coin_pair"`
-	OpenPrice  float64 `json:"open_value"`
-	ClosePrice float64 `json:"close_value"`
+	CoinPair string `json:"coin_pair"`
 }
 
 func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
@@ -87,17 +85,11 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
 				order := models.OrderRequest{}
 				orderResp := models.OrderResponse{}
-				if trade_req.ClosePrice > trade_req.OpenPrice {
-					if v.OpenLong <= 0 {
-						return
-					}
-					order.Side = "open_long"
-				} else {
-					if v.OpenShort <= 0 {
-						return
-					}
-					order.Side = "open_short"
+				if v.OpenLong <= 0 {
+					return
 				}
+				order.Side = "open_long"
+
 				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
 				cond := models.Conditions{}
 				c, err := cond.FindCondition(s.DB, val)
@@ -167,12 +159,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 }
 
 func (t *TradeRequest) Validate() error {
-	if t.ClosePrice == 0 {
-		return errors.New("close price is required")
-	}
-	if t.OpenPrice == 0 {
-		return errors.New("open price is required")
-	}
 	if t.CoinPair == "" {
 		return errors.New("coin pair is required")
 	}
