@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"math"
 	"os"
+	"strconv"
 
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/sirupsen/logrus"
@@ -11,6 +14,7 @@ import (
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/joho/godotenv"
 	"github.com/kryptomind/BidBox-Trades/controllers"
+	"github.com/kryptomind/BidBox-Trades/utils"
 )
 
 var server = controllers.Server{}
@@ -57,12 +61,23 @@ var (
 func main() {
 	futures.UseTestnet = true
 	BinanceClient := futures.NewClient(apiKey, secretKey)
+	x, err := utils.GetSize("SXRPSUSDT_SUMCBL", 13.3)
 
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	rounded := math.Round(x)
+	str := strconv.Itoa(int(rounded))
+	fmt.Println(str)
+
+	log.Println(x)
 	order, err := BinanceClient.NewCreateOrderService().Symbol("XRPUSDT").
-		Side(futures.SideTypeBuy).Type(futures.OrderTypeLimit).
-		TimeInForce(futures.TimeInForceTypeGTC).Quantity("100").
+		Side(futures.SideTypeBuy).Type(futures.OrderTypeMarket).
+		Quantity(str).
 		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
-		Price("0.2").Do(context.Background())
+		Do(context.Background())
 	if err != nil {
 		fmt.Println(err)
 		return
