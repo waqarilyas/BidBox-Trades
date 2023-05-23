@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"os"
 
+	"github.com/adshao/go-binance/v2/futures"
 	"github.com/sirupsen/logrus"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
@@ -46,6 +49,25 @@ func Run() {
 	server.Run(":8080")
 }
 
+var (
+	apiKey    = "00489718282f193987342a3c748f15193821e981d06de54988008f972fb42796"
+	secretKey = "6479cecf6661c4073f11583306e41d486dfb320c2d4cc544817de61166bb82ba"
+)
+
 func main() {
+	futures.UseTestnet = true
+	BinanceClient := futures.NewClient(apiKey, secretKey)
+
+	order, err := BinanceClient.NewCreateOrderService().Symbol("XRPUSDT").
+		Side(futures.SideTypeBuy).Type(futures.OrderTypeLimit).
+		TimeInForce(futures.TimeInForceTypeGTC).Quantity("100").
+		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
+		Price("0.2").Do(context.Background())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(order)
+
 	Run()
 }
