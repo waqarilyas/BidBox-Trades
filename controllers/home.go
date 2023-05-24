@@ -90,6 +90,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				}
 				order.Side = "open_long"
 
+				log.Println(v.UserEmail)
 				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
 				cond := models.Conditions{}
 				c, err := cond.FindCondition(s.DB, val)
@@ -115,17 +116,17 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				go func() {
 					str, err := NewOrder(api_key, secret_key, passphrase, &order)
 					if err != nil {
-						response.ERROR(w, http.StatusInternalServerError, err)
+						log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
 						return
 					}
 
 					if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
-						response.ERROR(w, http.StatusBadRequest, err)
+						log.Error("parse fail: " + err.Error() + " for " + v.UserEmail)
 						return
 					}
 
 					if orderResp.Code != "00000" {
-						response.ERROR(w, http.StatusExpectationFailed, errors.New(orderResp.Msg))
+						log.Error(orderResp.Msg + " : " + v.UserEmail)
 						return
 					}
 					new_order := models.Order{
