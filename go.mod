@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/amir-the-h/okex v1.1.4-alpha // indirect
 	github.com/bitly/go-simplejson v0.5.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 )

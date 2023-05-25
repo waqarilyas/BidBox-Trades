@@ -123,7 +123,7 @@ func DecryptKeys(api_key string, secret_key string, passphrase string, service s
 		log.Fatal(err)
 		return "", "", ""
 	}
-	if service == "bitget" {
+	if service == "bitget" || service == "okx" {
 		passphrase, err = helpers.DecryptStrings(passphrase)
 		if err != nil {
 			log.Fatal(err)

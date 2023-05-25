@@ -3,6 +3,8 @@ github.com/adshao/go-binance/v2 v2.4.2 h1:NBNMUyXrci45v3sr0RkZosiBYSw1/yuqCrJNky
 github.com/adshao/go-binance/v2 v2.4.2/go.mod h1:41Up2dG4NfMXpCldrDPETEtiOq+pHoGsFZ73xGgaumo=
 github.com/ahmed-023/bitget-helpers v0.0.1 h1:6j2b3+Q+eDOfKTSgy7GSnJ0CBHyDhvppb57+7ZxZh6I=
 github.com/ahmed-023/bitget-helpers v0.0.1/go.mod h1:RG9y12RTSz76CcIRY8sFr95/GlupeOOFZmxU9vKpnGI=
+github.com/amir-the-h/okex v1.1.4-alpha h1:dnn14GAUxi0W2yNxL2GERZTZ/iAUkCBnAbV6Z/CxWv8=
+github.com/amir-the-h/okex v1.1.4-alpha/go.mod h1:ngcGmYzAiBKg18umdZqBDM8aluy3Q0gJMGSyeLo1XHA=
 github.com/andybalholm/cascadia v1.1.0/go.mod h1:GsXiBklL0woXo1j/WYWtSYYC4ouU9PqHO0sqidkEA4Y=
 github.com/antonfisher/nested-logrus-formatter v1.3.1 h1:NFJIr+pzwv5QLHTPyKz9UMEoHck02Q9L0FP13b/xSbQ=
 github.com/antonfisher/nested-logrus-formatter v1.3.1/go.mod h1:6WTfyWFkBc9+zyBaKIqRrg/KwMqBbodBjgbHjDz7zjA=

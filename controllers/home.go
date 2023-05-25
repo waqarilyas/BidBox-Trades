@@ -10,15 +10,16 @@ import (
 	"strconv"
 	"strings"
 
+	requests "github.com/amir-the-h/okex/requests/rest/trade"
+
 	"github.com/adshao/go-binance/v2/futures"
+	"github.com/amir-the-h/okex"
+	"github.com/amir-the-h/okex/api"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
 	log "github.com/sirupsen/logrus"
 )
-
-var modes = []string{"conservative", "aggressive"}
-var strategies = []string{"cycle", "single", "stop make", "stop long", "stop short"}
 
 type Account struct {
 	Code        string `json:"code"`
@@ -212,6 +213,57 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				app_data.Keys_list[i].OpenLong = v.OpenLong - 1
 				go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
 
+			} else if v.Service == "okx" {
+
+				dest := okex.DemoServer // The main API server
+				ctx := context.Background()
+
+				api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "okx")
+				c, err := api.NewClient(ctx, api_key, secret_key, passphrase, dest)
+				if err != nil {
+					log.Fatalln(err)
+				}
+				symbol := strings.Split(trade_req.CoinPair, "_")[0]
+
+				x, err := utils.GetSize(trade_req.CoinPair, first_order)
+
+				if err != nil {
+					log.Error(err)
+					return
+				}
+
+				switch symbol {
+				case "SETHSUSDT":
+					symbol = "ETH-USDT"
+				case "SEOSSUSDT":
+					symbol = "EOS-USDT"
+				case "SXRPSUSDT":
+					symbol = "XRP-USDT"
+				case "SBTCSUSDT":
+					symbol = "BTC-USDT"
+				default:
+					symbol = "XRP-USDT"
+				}
+
+				req := []requests.PlaceOrder{
+					{
+						InstID:  symbol,
+						TdMode:  okex.TradeCashMode,
+						Side:    okex.OrderBuy,
+						OrdType: okex.OrderMarket,
+						Sz:      x,
+					},
+				}
+				res, _ := c.Rest.Trade.PlaceOrder(req)
+
+				if res.Code == 0 {
+					log.Println("Trade made for " + symbol + " : " + v.UserEmail)
+					app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+					go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+
+				} else {
+					log.Error(res.Msg)
+				}
 			}
 		}(v, i)
 	}
@@ -235,7 +287,7 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 		return
 	}
 
-	if service != "bitget" && service != "binance" {
+	if service != "bitget" && service != "binance" && service != "okx" {
 		response.ERROR(w, http.StatusBadRequest, errors.New("service not supported"))
 		return
 	}
