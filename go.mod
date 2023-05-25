@@ -12,6 +12,12 @@ require (
 )
 
 require (
+	github.com/bitly/go-simplejson v0.5.0 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
+)
+
+require (
+	github.com/adshao/go-binance/v2 v2.4.2
 	github.com/ahmed-023/bitget-helpers v0.0.1
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/go-playground/locales v0.14.1 // indirect

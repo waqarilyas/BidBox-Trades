@@ -1,12 +1,16 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
+	"strconv"
+	"strings"
 
+	"github.com/adshao/go-binance/v2/futures"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
@@ -81,24 +85,28 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	for i, v := range app_data.Keys_list {
 
 		go func(v models.Key, i int) {
+
+			if v.OpenLong <= 0 {
+				return
+			}
+			val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
+			cond := models.Conditions{}
+			c, err := cond.FindCondition(s.DB, val)
+			if err != nil {
+				log.Fatal(err)
+				return
+			}
+
+			first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
 			if v.Service == "bitget" {
-				api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase)
+				api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
 				order := models.OrderRequest{}
 				orderResp := models.OrderResponse{}
-				if v.OpenLong <= 0 {
-					return
-				}
+
 				order.Side = "open_long"
 
 				log.Println(v.UserEmail)
-				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
-				cond := models.Conditions{}
-				c, err := cond.FindCondition(s.DB, val)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
+
 				order.Symbol = trade_req.CoinPair
 				order.MarginCoin = "SUSDT"
 				size, err := utils.GetSize(order.Symbol, first_order)
@@ -151,6 +159,59 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					res["order_id"] = orderResp.Data.OrderID
 					log.Println(res)
 				}()
+			} else if v.Service == "binance" {
+				futures.UseTestnet = true
+
+				api_key, secret_key, _ := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
+				BinanceClient := futures.NewClient(api_key, secret_key)
+
+				symbol := strings.Split(trade_req.CoinPair, "_")[0]
+
+				x, err := utils.GetSize(trade_req.CoinPair, first_order)
+
+				if err != nil {
+					log.Error(err)
+					return
+				}
+
+				var str string
+
+				switch symbol {
+				case "SETHSUSDT":
+					symbol = "ETHUSDT"
+					str = fmt.Sprintf("%.3f", x)
+				case "SEOSSUSDT":
+					symbol = "EOSUSDT"
+					str = strconv.Itoa(int(math.Round(x)))
+				case "SXRPSUSDT":
+					symbol = "XRPUSDT"
+					str = strconv.Itoa(int(math.Round(x)))
+				case "SBTCSUSDT":
+					symbol = "BTCUSDT"
+					str = fmt.Sprintf("%.4f", x)
+				default:
+					symbol = "XRPUSDT"
+					str = "5"
+				}
+
+				// rounded := math.Round(x)
+				// str := strconv.Itoa(int(rounded))
+
+				fmt.Println(str)
+
+				order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
+					Side(futures.SideTypeBuy).Type(futures.OrderTypeMarket).
+					Quantity(str).
+					NewOrderResponseType(futures.NewOrderRespTypeRESULT).
+					Do(context.Background())
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				log.Println(order)
+				app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+				go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+
 			}
 		}(v, i)
 	}
@@ -174,7 +235,7 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 		return
 	}
 
-	if service != "bitget" {
+	if service != "bitget" && service != "binance" {
 		response.ERROR(w, http.StatusBadRequest, errors.New("service not supported"))
 		return
 	}

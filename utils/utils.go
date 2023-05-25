@@ -104,6 +104,7 @@ func GetSize(symbol string, first_order float64) (float64, error) {
 
 	return first_order / fprice, nil
 }
+
 func CheckBalance(val int) error {
 	if val < 200 {
 		return errors.New("Balance should be at least 200 USDT")
@@ -111,7 +112,7 @@ func CheckBalance(val int) error {
 	return nil
 }
 
-func DecryptKeys(api_key string, secret_key string, passphrase string) (string, string, string) {
+func DecryptKeys(api_key string, secret_key string, passphrase string, service string) (string, string, string) {
 	api_key, err := helpers.DecryptStrings(api_key)
 	if err != nil {
 		log.Fatal(err)
@@ -122,10 +123,15 @@ func DecryptKeys(api_key string, secret_key string, passphrase string) (string, 
 		log.Fatal(err)
 		return "", "", ""
 	}
-	passphrase, err = helpers.DecryptStrings(passphrase)
-	if err != nil {
-		log.Fatal(err)
-		return "", "", ""
+	if service == "bitget" {
+		passphrase, err = helpers.DecryptStrings(passphrase)
+		if err != nil {
+			log.Fatal(err)
+			return "", "", ""
+		}
+	} else if service == "binance" {
+		passphrase = ""
 	}
+
 	return api_key, secret_key, passphrase
 }
