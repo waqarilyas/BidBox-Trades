@@ -23,12 +23,13 @@ func (u *Conditions) FindAllConditions(db *gorm.DB) (*[]Conditions, error) {
 }
 
 func (u *Conditions) FindCondition(db *gorm.DB, capital int) (*Conditions, error) {
-	err := db.Model(Conditions{}).Where("capital = ?", capital).Take(&u).Error
+	cond := Conditions{}
+	err := db.Model(Conditions{}).Where("capital = ?", capital).Take(&cond).Error
 	if err != nil {
 		return &Conditions{}, err
 	}
 	if gorm.IsRecordNotFoundError(err) {
 		return &Conditions{}, errors.New("Key not found")
 	}
-	return u, nil
+	return &cond, nil
 }

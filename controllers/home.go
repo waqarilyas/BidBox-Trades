@@ -49,12 +49,13 @@ type User struct {
 
 type TradeRequest struct {
 	CoinPair string `json:"coin_pair"`
+	Long     int    `json:"long"`
 }
 
 func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
 	key, err := key.ChangePositions(s.DB, val, pos)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return
 	}
 	log.Println(key)
@@ -74,7 +75,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		response.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
-	log.Println(trade_req)
 	err = trade_req.Validate()
 	if err != nil {
 		response.ERROR(w, http.StatusBadRequest, err)
@@ -87,14 +87,17 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 		go func(v models.Key, i int) {
 
-			if v.OpenLong <= 0 {
+			if trade_req.Long == 1 && v.OpenLong <= 0 {
+				return
+			}
+			if trade_req.Long == 0 && v.OpenShort <= 0 {
 				return
 			}
 			val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
 			cond := models.Conditions{}
 			c, err := cond.FindCondition(s.DB, val)
 			if err != nil {
-				log.Fatal(err)
+				log.Error(err)
 				return
 			}
 
@@ -104,9 +107,11 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				order := models.OrderRequest{}
 				orderResp := models.OrderResponse{}
 
-				order.Side = "open_long"
-
-				log.Println(v.UserEmail)
+				if trade_req.Long == 1 {
+					order.Side = "open_long"
+				} else {
+					order.Side = "open_short"
+				}
 
 				order.Symbol = trade_req.CoinPair
 				order.MarginCoin = "SUSDT"
@@ -116,7 +121,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				order.Size = fmt.Sprintf("%f", size)
-				log.Println(order.Size)
 				order.OrderType = "market"
 				// order.StopLoss = fmt.Sprintf("%F", (size * 0.8))
 				// fmt.Println(order.StopLoss)
@@ -148,7 +152,11 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 						OrderID:    orderResp.Data.OrderID,
 						ClientID:   orderResp.Data.ClientOid,
 					}
-					new_order.SaveOrder(s.DB)
+					_, err = new_order.SaveOrder(s.DB)
+					if err != nil {
+						log.Error(err)
+						return
+					}
 					if order.Side == "open_short" {
 						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
 						go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
@@ -165,7 +173,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 				api_key, secret_key, _ := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
 				BinanceClient := futures.NewClient(api_key, secret_key)
-
 				symbol := strings.Split(trade_req.CoinPair, "_")[0]
 
 				x, err := utils.GetSize(trade_req.CoinPair, first_order)
@@ -195,13 +202,19 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					str = "5"
 				}
 
+				var side futures.SideType
+				if trade_req.Long == 1 {
+					side = futures.SideTypeBuy
+				} else {
+					side = futures.SideTypeSell
+				}
 				// rounded := math.Round(x)
 				// str := strconv.Itoa(int(rounded))
 
 				fmt.Println(str)
 
 				order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-					Side(futures.SideTypeBuy).Type(futures.OrderTypeMarket).
+					Side(side).Type(futures.OrderTypeMarket).
 					Quantity(str).
 					NewOrderResponseType(futures.NewOrderRespTypeRESULT).
 					Do(context.Background())
@@ -210,9 +223,13 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				log.Println(order)
-				app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-				go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
-
+				if side == futures.SideTypeSell {
+					app_data.Keys_list[i].OpenShort = v.OpenShort - 1
+					go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
+				} else if side == futures.SideTypeBuy {
+					app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+					go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+				}
 			} else if v.Service == "okx" {
 
 				dest := okex.DemoServer // The main API server
@@ -245,11 +262,17 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					symbol = "XRP-USDT"
 				}
 
+				var side okex.OrderSide
+				if trade_req.Long == 1 {
+					side = okex.OrderBuy
+				} else {
+					side = okex.OrderSell
+				}
 				req := []requests.PlaceOrder{
 					{
 						InstID:  symbol,
 						TdMode:  okex.TradeCashMode,
-						Side:    okex.OrderBuy,
+						Side:    side,
 						OrdType: okex.OrderMarket,
 						Sz:      x,
 					},
@@ -258,8 +281,13 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 				if res.Code == 0 {
 					log.Println("Trade made for " + symbol + " : " + v.UserEmail)
-					app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-					go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+					if side == okex.OrderSell {
+						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
+						go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
+					} else if side == okex.OrderBuy {
+						app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+						go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+					}
 
 				} else {
 					log.Error(res.Msg)
