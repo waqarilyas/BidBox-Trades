@@ -101,6 +101,13 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 
+			if trade_req.Long == 1 && v.Prev == "long" {
+				return
+			}
+			if trade_req.Long == 0 && v.Prev == "short" {
+				return
+			}
+
 			first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
 			if v.Service == "bitget" {
 				api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
@@ -159,9 +166,11 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					}
 					if order.Side == "open_short" {
 						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
+						app_data.Keys_list[i].Prev = "short"
 						go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
 					} else if order.Side == "open_long" {
 						app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+						app_data.Keys_list[i].Prev = "long"
 						go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
 					}
 					res["client_id"] = orderResp.Data.ClientOid
@@ -225,9 +234,11 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				log.Println(order)
 				if side == futures.SideTypeSell {
 					app_data.Keys_list[i].OpenShort = v.OpenShort - 1
+					app_data.Keys_list[i].Prev = "short"
 					go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
 				} else if side == futures.SideTypeBuy {
 					app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+					app_data.Keys_list[i].Prev = "long"
 					go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
 				}
 			} else if v.Service == "okx" {
@@ -283,9 +294,11 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					log.Println("Trade made for " + symbol + " : " + v.UserEmail)
 					if side == okex.OrderSell {
 						app_data.Keys_list[i].OpenShort = v.OpenShort - 1
+						app_data.Keys_list[i].Prev = "short"
 						go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
 					} else if side == okex.OrderBuy {
 						app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+						app_data.Keys_list[i].Prev = "long"
 						go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
 					}
 
