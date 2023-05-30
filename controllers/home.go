@@ -149,15 +149,15 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 						log.Error(orderResp.Msg + " : " + v.UserEmail)
 						return
 					}
+					sp := strings.Split(order.Side, "_")
 					new_order := models.Order{
 						Email:      v.UserEmail,
 						Symbol:     order.Symbol,
 						Size:       order.Size,
-						Side:       order.Side,
+						Side:       sp[1],
 						MarginCoin: order.MarginCoin,
 						OrderType:  order.OrderType,
-						OrderID:    orderResp.Data.OrderID,
-						ClientID:   orderResp.Data.ClientOid,
+						Service:    "bitget",
 					}
 					_, err = new_order.SaveOrder(s.DB)
 					if err != nil {
@@ -232,6 +232,21 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				log.Println(order)
+				new_order := models.Order{
+					Email:      v.UserEmail,
+					Symbol:     order.Symbol,
+					Size:       str,
+					Side:       string(order.Side),
+					MarginCoin: "USDT",
+					OrderType:  "market",
+					Service:    "binance",
+				}
+				_, err = new_order.SaveOrder(s.DB)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+
 				if side == futures.SideTypeSell {
 					app_data.Keys_list[i].OpenShort = v.OpenShort - 1
 					app_data.Keys_list[i].Prev = "short"
