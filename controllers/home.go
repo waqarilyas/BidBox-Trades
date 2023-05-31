@@ -122,7 +122,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 				order.Symbol = trade_req.CoinPair
 				order.MarginCoin = "SUSDT"
-				size, err := utils.GetSize(order.Symbol, first_order)
+				size, p, err := utils.GetSize(order.Symbol, first_order)
 				if err != nil {
 					log.Fatal(err)
 					return
@@ -151,13 +151,14 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					}
 					sp := strings.Split(order.Side, "_")
 					new_order := models.Order{
-						Email:      v.UserEmail,
-						Symbol:     order.Symbol,
-						Size:       order.Size,
-						Side:       sp[1],
-						MarginCoin: order.MarginCoin,
-						OrderType:  order.OrderType,
-						Service:    "bitget",
+						Email:       v.UserEmail,
+						Symbol:      order.Symbol,
+						Size:        order.Size,
+						Side:        sp[1],
+						MarginCoin:  order.MarginCoin,
+						OrderType:   order.OrderType,
+						Service:     "bitget",
+						QuoteAmount: p,
 					}
 					_, err = new_order.SaveOrder(s.DB)
 					if err != nil {
@@ -184,7 +185,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				BinanceClient := futures.NewClient(api_key, secret_key)
 				symbol := strings.Split(trade_req.CoinPair, "_")[0]
 
-				x, err := utils.GetSize(trade_req.CoinPair, first_order)
+				x, p, err := utils.GetSize(trade_req.CoinPair, first_order)
 
 				if err != nil {
 					log.Error(err)
@@ -233,13 +234,14 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				}
 				log.Println(order)
 				new_order := models.Order{
-					Email:      v.UserEmail,
-					Symbol:     order.Symbol,
-					Size:       str,
-					Side:       string(order.Side),
-					MarginCoin: "USDT",
-					OrderType:  "market",
-					Service:    "binance",
+					Email:       v.UserEmail,
+					Symbol:      order.Symbol,
+					Size:        str,
+					Side:        string(order.Side),
+					MarginCoin:  "USDT",
+					OrderType:   "market",
+					Service:     "binance",
+					QuoteAmount: p,
 				}
 				_, err = new_order.SaveOrder(s.DB)
 				if err != nil {
@@ -268,7 +270,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				}
 				symbol := strings.Split(trade_req.CoinPair, "_")[0]
 
-				x, err := utils.GetSize(trade_req.CoinPair, first_order)
+				x, _, err := utils.GetSize(trade_req.CoinPair, first_order)
 
 				if err != nil {
 					log.Error(err)
