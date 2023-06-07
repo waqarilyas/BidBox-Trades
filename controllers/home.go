@@ -78,8 +78,6 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//	stop_loss := 0.8 * float64(300)
-	//take_profit := 1.1 * float64(300)
 	for i, v := range app_data.Keys_list {
 
 		go func(v models.Key, i int) {
