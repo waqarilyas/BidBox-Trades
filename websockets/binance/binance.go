@@ -42,54 +42,27 @@ func (s *Server) WebsocketTest() {
 		paramsList = append(paramsList, eventString)
 	}
 
-	url := "wss://fstream.binance.com/ws/"
-	dialer := &websocket.Dialer{}
-
-	conn, _, err := dialer.Dial(url, nil)
-	if err != nil {
-		log.Fatal("WebSocket connection error:", err)
-	}
-	defer conn.Close()
-
-	go func() {
-		for {
-			_, message, err := conn.ReadMessage()
-			if err != nil {
-				log.Println("WebSocket message receiving error:", err)
-				break
-			}
-
-			var eventData MarketEvent
-
-			err = json.Unmarshal(message, &eventData)
-			if err != nil {
-				return
-			}
-			go handleMarketUpdate(eventData.Symbol, eventData.MarketPrice)
-
-		}
-	}()
-
-	subscribeRequest := struct {
-		Method string   `json:"method"`
-		Params []string `json:"params"`
-		ID     int      `json:"id"`
-	}{
-		Method: "SUBSCRIBE",
-		Params: paramsList,
-		ID:     1,
-	}
-
-	err = conn.WriteJSON(subscribeRequest)
-	if err != nil {
-		log.Println("WebSocket message sending error:", err)
-		return
-	}
-
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
 	for {
+		conn, err := connectWebSocket()
+		if err != nil {
+			log.Println("WebSocket connection error:", err)
+			time.Sleep(5 * time.Second) // Wait for 5 seconds before reconnecting
+			continue
+		}
+
+		err = subscribeToMarketEvents(conn, paramsList)
+		if err != nil {
+			log.Println("WebSocket subscribe error:", err)
+			conn.Close()
+			time.Sleep(5 * time.Second) // Wait for 5 seconds before reconnecting
+			continue
+		}
+
+		go handleWebSocketMessages(conn)
+
 		select {
 		case <-interrupt:
 			log.Println("Received interrupt signal. Closing WebSocket connection...")
@@ -103,7 +76,59 @@ func (s *Server) WebsocketTest() {
 	}
 }
 
+func connectWebSocket() (*websocket.Conn, error) {
+	url := "wss://fstream.binance.com/ws/"
+	dialer := &websocket.Dialer{}
+
+	conn, _, err := dialer.Dial(url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return conn, nil
+}
+
+func subscribeToMarketEvents(conn *websocket.Conn, paramsList []string) error {
+	subscribeRequest := struct {
+		Method string   `json:"method"`
+		Params []string `json:"params"`
+		ID     int      `json:"id"`
+	}{
+		Method: "SUBSCRIBE",
+		Params: paramsList,
+		ID:     1,
+	}
+
+	err := conn.WriteJSON(subscribeRequest)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func handleWebSocketMessages(conn *websocket.Conn) {
+	defer conn.Close()
+
+	for {
+		_, message, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("WebSocket message receiving error:", err)
+			return
+		}
+
+		var eventData MarketEvent
+
+		err = json.Unmarshal(message, &eventData)
+		if err != nil {
+			log.Println("WebSocket message parsing error:", err)
+			continue
+		}
+
+		go handleMarketUpdate(eventData.Symbol, eventData.MarketPrice)
+	}
+}
+
 func handleMarketUpdate(coinPair string, marketPrice string) {
 	fmt.Println("---- coin pair ----", coinPair, " ---- ", marketPrice)
-
 }
