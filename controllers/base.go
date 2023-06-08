@@ -40,6 +40,7 @@ func (server *Server) Initialize(Dbdriver, DbUser, DbPassword, DbPort, DbHost, D
 	server.Router = mux.NewRouter()
 	server.initializeRoutes()
 	server.InitKeys()
+
 	//server.InitConditions()
 }
 

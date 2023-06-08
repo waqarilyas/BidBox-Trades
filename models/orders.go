@@ -2,9 +2,43 @@ package models
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/jinzhu/gorm"
 )
+type BybitOrderRequest struct {
+	Category      string `json:"category"`
+	Symbol        string `json:"symbol"`
+	Side          string `json:"side"`
+	OrderType     string `json:"orderType"`
+	Qty           string `json:"qty"`
+	TimeInForce   string `json:"timeInForce"`
+	ReduceOnly    bool   `json:"reduce_only"`
+	CloseOnTrigger bool   `json:"closeOnTrigger"`
+}
+type BybitResponse struct {
+	RetCode    int                    `json:"retCode"`
+	RetMsg     string                 `json:"retMsg"`
+	Result     struct {
+		OrderID     string `json:"orderId"`
+		OrderLinkId string `json:"orderLinkId"`
+	} `json:"result"`
+	RetExtInfo map[string]interface{} `json:"retExtInfo"`
+	Time       int64                  `json:"time"`
+}
+// type BybitResponse struct {
+// 	RetCode    int                    `json:"retCode"`
+// 	RetMsg     string                 `json:"retMsg"`
+// 	Result     struct {
+// 		OrderID     string `json:"order_id"`
+// 		OrderLinkId string `json:"orderLinkId"`
+// 	}
+// 	RetExtInfo map[string]interface{} `json:"retExtInfo"`
+// 	Time       int64                  `json:"time"`
+// }
+
+
+
 
 type OrderRequest struct {
 	Symbol     string `json:"symbol"`
@@ -69,6 +103,7 @@ func (o *OrderRequest) Validate() error {
 func (o *Order) SaveOrder(db *gorm.DB) (*Order, error) {
 	err := db.Create(&o).Error
 	if err != nil {
+		fmt.Println("error in saving func")
 		return &Order{}, err
 	}
 	return o, nil
