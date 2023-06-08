@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"bytes"
+	"strconv"
 	"crypto/hmac"
+	"encoding/hex"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -154,5 +156,58 @@ func NewOrder(api_key string, secret_key string, passphrase string, order *model
 		log.Error(err)
 		return "", err
 	}
+	return string(body), nil
+}
+
+func GenerateBybitSignature(apiKey, apiSecret string, recvWindow, timestamp int64, queryString string) string {
+	dataToSign := fmt.Sprintf("%d%s%d%s", timestamp, apiKey, recvWindow, queryString)
+	hmacKey := []byte(apiSecret)
+	hmacHash := hmac.New(sha256.New, hmacKey)
+	hmacHash.Write([]byte(dataToSign))
+	signature := hex.EncodeToString(hmacHash.Sum(nil))
+	return signature
+}
+func BybitNewOrder2(api_key string, secret_key string, passphrase string, order *models.BybitOrderRequest) (string, error) {
+	host := "https://api-testnet.bybit.com"
+	path := "/v5/order/create"
+	url := host + path
+	method := "POST"
+	jsonVal, err := json.Marshal(order)
+	if err != nil {
+		log.Error(err)
+		// fmt.Println("failed order: ")
+		return "", err
+	}
+
+	client := &http.Client {
+	}
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonVal))
+	if err != nil {
+		return "", err
+	}
+	server_time := helpers.GetBybitServerTimeStamp()
+	time := strconv.FormatInt(server_time, 10)
+
+	signatures := GenerateBybitSignature(api_key, secret_key, 50000, server_time, string(jsonVal))
+	req.Header.Add("X-BAPI-API-KEY", api_key)
+	req.Header.Add("X-BAPI-TIMESTAMP", time)
+	req.Header.Add("X-BAPI-RECV-WINDOW", "50000")
+	req.Header.Add("X-BAPI-SIGN", signatures)
+
+	res, err := client.Do(req)
+	if err != nil {
+		// fmt.Println(err)
+		return "", err
+	}
+
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Println("error in real all 262")
+		// fmt.Println(err)
+		return	"", err
+	}
+	fmt.Println(string(body))
 	return string(body), nil
 }
