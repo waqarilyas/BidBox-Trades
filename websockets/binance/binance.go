@@ -25,6 +25,10 @@ type MarketEvent struct {
 	MarketPrice string `json:"p"`
 }
 
+type Cache struct {
+	Positions []models.Position
+}
+
 func (s *Server) WebsocketTest() {
 	var paramsList []string
 
@@ -45,6 +49,24 @@ func (s *Server) WebsocketTest() {
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
+	// Create a cache instance
+	cache := &Cache{}
+
+	// Start a goroutine to periodically update the cache
+	go func() {
+		for {
+			position := models.Position{}
+			positions, err := position.GetAllPositions(s.DB)
+			if err != nil {
+				log.Println("Error fetching positions:", err)
+			} else {
+				cache.Positions = *positions
+				log.Println("Positions cache updated successfully.")
+			}
+			time.Sleep(10 * time.Second) // Wait for 10 seconds before updating the cache again
+		}
+	}()
+
 	for {
 		conn, err := connectWebSocket()
 		if err != nil {
@@ -61,7 +83,7 @@ func (s *Server) WebsocketTest() {
 			continue
 		}
 
-		go handleWebSocketMessages(conn)
+		go handleWebSocketMessages(conn, s.DB, cache)
 
 		select {
 		case <-interrupt:
@@ -107,7 +129,7 @@ func subscribeToMarketEvents(conn *websocket.Conn, paramsList []string) error {
 	return nil
 }
 
-func handleWebSocketMessages(conn *websocket.Conn) {
+func handleWebSocketMessages(conn *websocket.Conn, db *gorm.DB, cache *Cache) {
 	defer conn.Close()
 
 	for {
@@ -125,10 +147,17 @@ func handleWebSocketMessages(conn *websocket.Conn) {
 			continue
 		}
 
-		go handleMarketUpdate(eventData.Symbol, eventData.MarketPrice)
+		go handleMarketUpdate(db, cache, eventData.Symbol, eventData.MarketPrice)
 	}
 }
 
-func handleMarketUpdate(coinPair string, marketPrice string) {
+func handleMarketUpdate(db *gorm.DB, cache *Cache, coinPair string, marketPrice string) {
 	fmt.Println("---- coin pair ----", coinPair, " ---- ", marketPrice)
+
+	// Access positions from the cache
+	positions := cache.Positions
+
+	fmt.Println("--- routine handled successfully ---", positions)
+
+	// for
 }
