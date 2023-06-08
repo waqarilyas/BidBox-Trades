@@ -9,9 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
+
+	log "github.com/sirupsen/logrus"
 
 	helpers "github.com/ahmed-023/bitget-helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
@@ -46,17 +47,17 @@ func (server *Server) PlaceOrder(w http.ResponseWriter, r *http.Request, email s
 		} else {
 			api_key, err = helpers.DecryptStrings(v.ApiKey)
 			if err != nil {
-				log.Fatal(err)
+				log.Error(err)
 				return
 			}
 			secret_key, err = helpers.DecryptStrings(v.SecretKey)
 			if err != nil {
-				log.Fatal(err)
+				log.Error(err)
 				return
 			}
 			passphrase, err = helpers.DecryptStrings(v.Passphrase)
 			if err != nil {
-				log.Fatal(err)
+				log.Error(err)
 				return
 			}
 		}
@@ -121,7 +122,7 @@ func NewOrder(api_key string, secret_key string, passphrase string, order *model
 
 	jsonVal, err := json.Marshal(order)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return "", err
 	}
 
@@ -137,20 +138,20 @@ func NewOrder(api_key string, secret_key string, passphrase string, order *model
 	req.Header.Add("local", "zh-CN")
 
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return "", err
 	}
 
 	res, err := client.Do(req)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return "", err
 	}
 	defer res.Body.Close()
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
 		return "", err
 	}
 	return string(body), nil

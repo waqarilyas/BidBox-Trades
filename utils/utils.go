@@ -77,33 +77,34 @@ type IndexPriceReq struct {
 	RequestTime int64  `json:"requestTime"`
 }
 
-func GetSize(symbol string, first_order float64) (float64, error) {
+func GetSize(symbol string, first_order float64) (float64, float64, error) {
 	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
 
 	client := http.Client{}
 
 	res, err := client.Get(url)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	defer res.Body.Close()
 
 	price := IndexPriceReq{}
 	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
 	if price.Code != "00000" {
-		return 0, errors.New(price.Msg)
+		return 0, 0, errors.New(price.Msg)
 	}
 
 	fprice, err := strconv.ParseFloat(price.Data.Index, 64)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 
-	return first_order / fprice, nil
+	return first_order / fprice, fprice, nil
 }
+
 func CheckBalance(val int) error {
 	if val < 200 {
 		return errors.New("Balance should be at least 200 USDT")
@@ -111,7 +112,7 @@ func CheckBalance(val int) error {
 	return nil
 }
 
-func DecryptKeys(api_key string, secret_key string, passphrase string) (string, string, string) {
+func DecryptKeys(api_key string, secret_key string, passphrase string, service string) (string, string, string) {
 	api_key, err := helpers.DecryptStrings(api_key)
 	if err != nil {
 		log.Fatal(err)
@@ -122,10 +123,15 @@ func DecryptKeys(api_key string, secret_key string, passphrase string) (string, 
 		log.Fatal(err)
 		return "", "", ""
 	}
-	passphrase, err = helpers.DecryptStrings(passphrase)
-	if err != nil {
-		log.Fatal(err)
-		return "", "", ""
+	if service == "bitget" || service == "okx" {
+		passphrase, err = helpers.DecryptStrings(passphrase)
+		if err != nil {
+			log.Fatal(err)
+			return "", "", ""
+		}
+	} else if service == "binance" {
+		passphrase = ""
 	}
+
 	return api_key, secret_key, passphrase
 }

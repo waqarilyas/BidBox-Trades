@@ -19,6 +19,7 @@ type Key struct {
 	OpenShort   int
 	OpenLong    int
 	TradeAmount int
+	Prev        string
 }
 
 func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
@@ -77,6 +78,7 @@ func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, erro
 		db = db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 			map[string]interface{}{
 				"open_short": pos,
+				"prev":       pos_type,
 			},
 		)
 		u.OpenShort = pos
@@ -84,6 +86,7 @@ func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, erro
 		db = db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 			map[string]interface{}{
 				"open_long": pos,
+				"prev":      pos_type,
 			},
 		)
 		u.OpenLong = pos

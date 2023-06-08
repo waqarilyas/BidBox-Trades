@@ -26,7 +26,6 @@ type MarketEvent struct {
 }
 
 func (s *Server) WebsocketTest() {
-
 	var paramsList []string
 
 	coinPair := models.CoinPair{}

@@ -1,0 +1,53 @@
+name: Deploy to Staging Server
+on:
+  push:
+    branches: [staging]
+
+jobs:
+  deploy:
+    name: Deploying to Staging Server
+    runs-on: [ self-hosted, bidbox-vm ]
+    environment: staging
+    env:
+      CONTAINER_NAME: bidbox-trades-service
+      IMAGE_NAME_TAG: bidbox-trades:latest
+      HOST_PORT: 8003
+      CONTAINER_PORT: 8080
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          clean: False
+      
+      - name: Make environment files
+        run: |
+            cat << EOF > .env
+            API_SECRET=${{ secrets.API_SECRET }}
+            DB_HOST=${{ secrets.DB_HOST }}
+            DB_DRIVER=${{ secrets.DB_DRIVER }}
+            DB_USER=${{ secrets.DB_USER }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            DB_NAME=${{ secrets.DB_NAME }}
+            DB_PORT=${{ secrets.DB_PORT }}
+            ENCRYPTION_PASS=${{ secrets.ENCRYPTION_PASS }}
+      
+      - name: Building and Assigning Tag to image
+        run: |
+          docker build -t $IMAGE_NAME_TAG .
+      
+      - name: Removing old Container if exits
+        run: |
+          docker stop $CONTAINER_NAME || true && docker rm $CONTAINER_NAME || true
+      
+      - name: Starting Docker Container
+        run: |
+          docker run -d -p $HOST_PORT:$CONTAINER_PORT --restart unless-stopped --name $CONTAINER_NAME  $IMAGE_NAME_TAG
+      
+      - name: View Docker status
+        run: |
+          docker ps
+      
+      - name: Cleaning Server
+        run: |
+          echo y | docker image prune --filter "dangling=true"

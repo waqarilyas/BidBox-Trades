@@ -27,19 +27,18 @@ type OrderResponse struct {
 }
 
 type Order struct {
-	Email      string
-	Symbol     string
-	MarginCoin string
-	Size       string
-	Side       string
-	OrderType  string
-	ClientID   string
-	OrderID    string
+	Email       string
+	Symbol      string
+	MarginCoin  string
+	Size        string
+	Side        string
+	OrderType   string
+	Service     string
+	QuoteAmount float64
+	Profit      float64
 }
 
 func (o *Order) Initialize(order OrderRequest, email string, client_id string, order_id string) {
-	o.ClientID = client_id
-	o.OrderID = order_id
 	o.MarginCoin = order.MarginCoin
 	o.Side = order.Side
 	o.Symbol = order.Symbol
