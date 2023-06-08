@@ -64,7 +64,6 @@ func (s *Server) WebsocketTest() {
 
 			err = json.Unmarshal(message, &eventData)
 			if err != nil {
-
 				return
 			}
 			go handleMarketUpdate(eventData.Symbol, eventData.MarketPrice)
@@ -88,7 +87,6 @@ func (s *Server) WebsocketTest() {
 		return
 	}
 
-	// Handle signals to gracefully close the WebSocket connection
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 
