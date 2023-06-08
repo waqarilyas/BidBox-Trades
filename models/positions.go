@@ -7,9 +7,9 @@ import (
 )
 
 type Position struct {
-	Id           int       `gorm:"primary_key" json:"id"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	Id           int       `gorm:"primary_key:autoIncrement" json:"id"`
+	CreatedAt    time.Time `gorm:"type:timestamptz;default:now()" json:"created_at"`
+	UpdatedAt    time.Time `gorm:"type:timestamptz:;default:now()" json:"updated_at"`
 	Symbol       string    `json:"symbol"`
 	Leverage     string    `json:"leverage"`
 	OpenPrice    float64   `json:"open_price"`
