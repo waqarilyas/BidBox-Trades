@@ -57,9 +57,12 @@ func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
 	key, err := key.ChangePositions(s.DB, val, pos)
 	if err != nil {
 		log.Error(err)
+		fmt.Println("error while updating positions")
+		fmt.Println(err)
 		return
 	}
 	log.Println(key)
+	// fmt.Println("succes updated positions")	
 }
 
 func (server *Server) Home(w http.ResponseWriter, r *http.Request) {
@@ -81,13 +84,13 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		response.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
-
+	fmt.Println("started")
 	//	stop_loss := 0.8 * float64(300)
 	//take_profit := 1.1 * float64(300)
-	for i, v := range app_data.Keys_list {     // for each user key
+	for i, v := range app_data.Keys_list { // for each user key
 		// fmt.Println("user: ", v.UserEmail)
 		go func(v models.Key, i int) {
-			
+
 			if trade_req.Long == 1 && v.Prev == "long" {
 				return
 			}
@@ -113,8 +116,12 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 			if trade_req.Exchange == "bitget" {
 				// fmt.Println("trade req for bitget")
 				if v.Service == "bitget" {
-					// fmt.Println("trade service for bitget")
-					api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
+					fmt.Println("trade service for bitget")
+					api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
+					if err != nil {
+						fmt.Println("error in decryptkeys: ", err)
+						return
+					}
 					order := models.OrderRequest{}
 					orderResp := models.OrderResponse{}
 
@@ -143,6 +150,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 						str, err := NewOrder(api_key, secret_key, passphrase, &order)
 						if err != nil {
 							log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
+							fmt.Println("failed order: ", err , " for " , v.UserEmail)
 							return
 						}
 
@@ -191,33 +199,49 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 			} else if trade_req.Exchange == "binance" {
 				// fmt.Println("trade req for binance")
 				if v.Service == "binance" {
-					// fmt.Println("trade service for binance")
+					fmt.Println("trade service for binance")
 					futures.UseTestnet = true
-
-					api_key, secret_key, _ := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
+					api_key, secret_key, _, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
+					if err != nil{
+						fmt.Println("error in decryptkeys: ", err)
+						return
+					}
+					// api_key, secret_key, _ := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
 					BinanceClient := futures.NewClient(api_key, secret_key)
-					symbol := strings.Split(trade_req.CoinPair, "_")[0]
-
-					x, p, err := utils.GetSize(trade_req.CoinPair, first_order)
-
+					// symbol := strings.Split(trade_req.CoinPair, "_")[0]
+					symbol2 := trade_req.CoinPair
+					switch symbol2 {
+					case "BTCUSDT":
+						symbol2 = "SBTCSUSDT_SUMCBL"
+					case "EOSUSDT":
+						symbol2 = "SEOSSUSDT_SUMCBL"
+					case "XRPUSDT":
+						symbol2 = "SXRPSUSDT_SUMCBL"
+					case "ETHUSDT":
+						symbol2 = "SETHSUSDT_SUMCBL"
+					default:
+						symbol2 = "SXRPSUSDT_SUMCBL"
+					}
+					x, p, err := utils.GetSize(symbol2, first_order)
+					
 					if err != nil {
 						log.Error(err)
 						return
 					}
 
 					var str string
-
+					symbol := trade_req.CoinPair
 					switch symbol {
-					case "SETHSUSDT":
+					case "ETHUSDT":
 						symbol = "ETHUSDT"
 						str = fmt.Sprintf("%.3f", x)
-					case "SEOSSUSDT":
+					case "EOSUSDT":
 						symbol = "EOSUSDT"
 						str = strconv.Itoa(int(math.Round(x)))
-					case "SXRPSUSDT":
+					case "XRPUSDT":
 						symbol = "XRPUSDT"
 						str = strconv.Itoa(int(math.Round(x)))
-					case "SBTCSUSDT":
+					case "BTCUSDT":
 						symbol = "BTCUSDT"
 						str = fmt.Sprintf("%.4f", x)
 						// fmt.Println("for coin BTCUSDT",str)
@@ -236,14 +260,15 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					// str := strconv.Itoa(int(rounded))
 
 					// fmt.Println(str)
-
+					fmt.Println("get size: " , str)
 					order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
 						Side(side).Type(futures.OrderTypeMarket).
-						Quantity(str).
+						Quantity(x).
 						NewOrderResponseType(futures.NewOrderRespTypeRESULT).
 						Do(context.Background())
 					if err != nil {
 						log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
+						fmt.Println("error in create order", err)
 						return
 					}
 					log.Println(order)
@@ -283,8 +308,12 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					// fmt.Println("trade service for okex")
 					dest := okex.DemoServer // The main API server
 					ctx := context.Background()
-
-					api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "okx")
+					api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "okx")
+					if err != nil{
+						fmt.Println("error in decryptkeys: ", err)
+						return
+					}
+					// api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "okx")
 					c, err := api.NewClient(ctx, api_key, secret_key, passphrase, dest)
 					if err != nil {
 						log.Fatalln(err)
@@ -343,10 +372,115 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					} else {
 						log.Error(res.Msg)
 					}
-				}else {
-					// fmt.Println("trade service for okex not allowed")
+				} else {
+					fmt.Println("trade service for okex not allowed")
 				}
-				
+
+			} else if trade_req.Exchange == "bybit" {
+				// fmt.Println("trade req for bybit")
+				if v.Service == "bybit" {
+					
+					fmt.Println("trade service for bybit")
+					// fmt.Println("api secret")
+					api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
+					if err != nil{
+						fmt.Println("error in decryptkeys: ", err)
+						return
+					}
+					// api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
+					order := models.BybitOrderRequest{}
+					orderResp := models.BybitResponse{}
+					// fmt.Println("models")
+					if trade_req.Long == 1 {
+						order.Side = "Buy"
+					} else {
+						order.Side = "Sell"
+					}
+					order.Symbol = trade_req.CoinPair
+					symbol := trade_req.CoinPair
+					order.Category = "linear"
+					order.OrderType = "Market"
+					order.TimeInForce = "GoodTillCancel"
+					order.ReduceOnly = false
+					order.CloseOnTrigger = false
+					order.OrderType = "Market"
+					switch symbol {
+					case "BTCUSDT":
+						symbol = "SBTCSUSDT_SUMCBL"
+					case "EOSUSDT":
+						symbol = "SEOSSUSDT_SUMCBL"
+					case "XRPUSDT":
+						symbol = "SXRPSUSDT_SUMCBL"
+					case "ETHUSDT":
+						symbol = "SETHSUSDT_SUMCBL"
+					default:
+						symbol = "SXRPSUSDT_SUMCBL"
+					}
+					
+					size, p, err := utils.GetSize(symbol, first_order)
+			
+					if err != nil {
+						log.Fatal(err)
+						fmt.Println(err, " in get size for ", v.UserEmail)
+						return
+					}
+					order.Qty = fmt.Sprintf("%f", size)
+					go func() {
+						str, err := BybitNewOrder2(api_key, secret_key, passphrase, &order)
+						if err != nil {
+							log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
+							// fmt.Println("failed order: " + err.Error() + " for " + v.UserEmail)
+							return
+						}
+						if str == "" {
+							log.Error("empty response for " + v.UserEmail)
+							fmt.Println("empty response for " + v.UserEmail)
+							return
+						}
+						if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
+							log.Error("parse fail: " + err.Error() + " for " + v.UserEmail)
+							fmt.Println("parse fail: " + err.Error() + " for " + v.UserEmail)
+							return
+						}
+
+						if orderResp.RetCode != 0 {
+							log.Error(orderResp.RetMsg + " :: " + v.UserEmail)
+							fmt.Println("error in retCode")
+							return
+						}
+						new_order := models.Order{
+							Email:       v.UserEmail,
+							Symbol:      order.Symbol,
+							Size:        order.Qty,
+							Side:        order.Side,
+							MarginCoin:  "USDT",
+							OrderType:   order.OrderType,
+							Service:     "bybit",
+							QuoteAmount: p,
+						}
+						_, err = new_order.SaveOrder(s.DB)
+						if err != nil {
+							log.Error("err saving order: " + err.Error() + " for " + v.UserEmail)
+							fmt.Println("error in saving order: ", err)
+							return
+						}
+						if order.Side == "Buy" {
+							app_data.Keys_list[i].OpenShort = v.OpenShort - 1
+							app_data.Keys_list[i].Prev = "short"
+							go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
+						} else if order.Side == "Sell" {
+							app_data.Keys_list[i].OpenLong = v.OpenLong - 1
+							app_data.Keys_list[i].Prev = "long"
+							go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+						}
+						// res["client_id"] = orderResp.Result.OrderID
+						// res["order_id"] = orderResp.Result.OrderLinkId
+						// fmt.Println("res order placed for " + v.UserEmail)
+						// fmt.Println(res)
+					}()
+				} else {
+					// fmt.Println("trade service for bybit not found")
+				}
 			}
 		}(v, i)
 	}
