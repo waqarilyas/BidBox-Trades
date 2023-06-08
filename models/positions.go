@@ -22,6 +22,7 @@ type Position struct {
 	Size         string    `json:"size"`
 	Margin       string    `json:"margin"`
 	UserEmail    string    `gorm:"not null" json:"user_email"`
+	Status       string    `gorm:"default:opened" json:"status"`
 }
 
 func (position *Position) CreateNewPosition(db *gorm.DB) (*Position, error) {
@@ -30,4 +31,13 @@ func (position *Position) CreateNewPosition(db *gorm.DB) (*Position, error) {
 		return &Position{}, err
 	}
 	return position, nil
+}
+
+func (u *Key) GetAllPositions(db *gorm.DB) (*[]Key, error) {
+	Keys := []Key{}
+	err := db.Model(&Key{}).Limit(100).Find(&Keys).Error
+	if err != nil {
+		return &[]Key{}, err
+	}
+	return &Keys, nil
 }
