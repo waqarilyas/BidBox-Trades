@@ -6,13 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
 	"time"
 
-	helpers "github.com/ahmed-023/bitget-helpers"
+	helpers "github.com/WAQAR5/bitget-helpers"
 )
 
 func initCoinPiars() ([]string, error) {
@@ -102,7 +103,12 @@ func GetSize(symbol string, first_order float64) (float64, float64, error) {
 		return 0, 0, err
 	}
 
-	return first_order / fprice, fprice, nil
+	tradeAmount := first_order / fprice
+
+	decimalMultiplier := math.Pow(10, float64(3))
+	fixedAmount := math.Round(tradeAmount*decimalMultiplier) / decimalMultiplier
+
+	return fixedAmount, fprice, nil
 }
 func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) {
 	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol

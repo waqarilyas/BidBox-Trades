@@ -2,21 +2,21 @@ package controllers
 
 import (
 	"bytes"
-	"strconv"
 	"crypto/hmac"
-	"encoding/hex"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
 
-	helpers "github.com/ahmed-023/bitget-helpers"
+	helpers "github.com/WAQAR5/bitget-helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 )
@@ -179,8 +179,7 @@ func BybitNewOrder2(api_key string, secret_key string, passphrase string, order 
 		return "", err
 	}
 
-	client := &http.Client {
-	}
+	client := &http.Client{}
 	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonVal))
 	if err != nil {
 		return "", err
@@ -206,7 +205,7 @@ func BybitNewOrder2(api_key string, secret_key string, passphrase string, order 
 	if err != nil {
 		fmt.Println("error in real all 262")
 		// fmt.Println(err)
-		return	"", err
+		return "", err
 	}
 	fmt.Println(string(body))
 	return string(body), nil

@@ -88,15 +88,15 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	//	stop_loss := 0.8 * float64(300)
 	//take_profit := 1.1 * float64(300)
 	for i, v := range app_data.Keys_list { // for each user key
-		// fmt.Println("user: ", v.UserEmail)
 		go func(v models.Key, i int) {
+			fmt.Println("user: ", v.UserEmail)
 
-			if trade_req.Long == 1 && v.Prev == "long" {
-				return
-			}
-			if trade_req.Long == 0 && v.Prev == "short" {
-				return
-			}
+			// if trade_req.Long == 1 && v.Prev == "long" {
+			// 	return
+			// }
+			// if trade_req.Long == 0 && v.Prev == "short" {
+			// 	return
+			// }
 			if trade_req.Long == 1 && v.OpenLong <= 0 {
 				return
 			}
@@ -115,7 +115,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 			// fmt.Println("condition: ", c.Positions)
 			first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
 			if trade_req.Exchange == "bitget" {
-				// fmt.Println("trade req for bitget")
+				fmt.Println("trade req for bitget", v.UserEmail)
 				if v.Service == "bitget" {
 					fmt.Println("trade service for bitget")
 					api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
@@ -252,18 +252,19 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					}
 
 					var side futures.SideType
+
+					var positionSide futures.PositionSideType
+
 					if trade_req.Long == 1 {
 						side = futures.SideTypeBuy
+						positionSide = "LONG"
 					} else {
 						side = futures.SideTypeSell
+						positionSide = "SHORT"
 					}
-					// rounded := math.Round(x)
-					// str := strconv.Itoa(int(rounded))
 
-					// fmt.Println(str)
-					fmt.Println("get size: ", str)
 					order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-						Side(side).Type(futures.OrderTypeMarket).
+						Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
 						Quantity(x).
 						NewOrderResponseType(futures.NewOrderRespTypeRESULT).
 						Do(context.Background())
@@ -378,11 +379,8 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				}
 
 			} else if trade_req.Exchange == "bybit" {
-				// fmt.Println("trade req for bybit")
 				if v.Service == "bybit" {
 
-					fmt.Println("trade service for bybit")
-					// fmt.Println("api secret")
 					api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
 					if err != nil {
 						fmt.Println("error in decryptkeys: ", err)

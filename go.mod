@@ -19,8 +19,8 @@ require (
 )
 
 require (
+	github.com/WAQAR5/bitget-helpers v1.0.0
 	github.com/adshao/go-binance/v2 v2.4.2
-	github.com/ahmed-023/bitget-helpers v0.0.1
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
