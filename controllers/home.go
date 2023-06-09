@@ -87,9 +87,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		response.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
-	fmt.Println("started")
-	//	stop_loss := 0.8 * float64(300)
-	//take_profit := 1.1 * float64(300)
+
 	for i, v := range app_data.Keys_list { // for each user key
 		go func(v models.Key, i int) {
 			fmt.Println("user: ", v.UserEmail)
@@ -131,7 +129,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 }
 
 func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string) {
-	fmt.Println("trade req for bitget", v.UserEmail)
+
 	if v.Service == "bitget" {
 		fmt.Println("trade service for bitget")
 		api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
@@ -284,6 +282,7 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		}
 
 		strValue := fmt.Sprintf("%f", x)
+
 		order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
 			Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
 			Quantity(strValue).
@@ -453,7 +452,6 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 			str, err := BybitNewOrder2(api_key, secret_key, passphrase, &order)
 			if err != nil {
 				log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
-				// fmt.Println("failed order: " + err.Error() + " for " + v.UserEmail)
 				return
 			}
 			if str == "" {
