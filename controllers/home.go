@@ -284,44 +284,42 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 
 		var side futures.SideType
 
-		var positionSide futures.PositionSideType
+					// var positionSide futures.PositionSideType
 
-		if trade_req.Long == 1 {
-			side = futures.SideTypeBuy
-			positionSide = "LONG"
-		} else {
-			side = futures.SideTypeSell
-			positionSide = "SHORT"
-		}
-
-		strValue := fmt.Sprintf("%f", x)
-
-		order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-			Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
-			Quantity(strValue).
-			NewOrderResponseType(futures.NewOrderRespTypeRESULT).
-			Do(context.Background())
-		if err != nil {
-			log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
-			fmt.Println("error in create order", err)
-			return
-		}
-		log.Println(order)
-		new_order := models.Order{
-			Email:       v.UserEmail,
-			Symbol:      order.Symbol,
-			Size:        str,
-			Side:        string(order.Side),
-			MarginCoin:  "USDT",
-			OrderType:   "market",
-			Service:     "binance",
-			QuoteAmount: p,
-		}
-		_, err = new_order.SaveOrder(s.DB)
-		if err != nil {
-			log.Error(err)
-			return
-		}
+					if trade_req.Long == 1 {
+						side = futures.SideTypeBuy
+						// positionSide = "LONG"
+					} else {
+						side = futures.SideTypeSell
+						// positionSide = "SHORT"
+					}
+					strValue := fmt.Sprintf("%f", x)
+					order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
+						Side(side).Type(futures.OrderTypeMarket).
+						Quantity(strValue).
+						NewOrderResponseType(futures.NewOrderRespTypeRESULT).
+						Do(context.Background())
+					if err != nil {
+						log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
+						fmt.Println("error in create order", err)
+						return
+					}
+					log.Println(order)
+					new_order := models.Order{
+						Email:       v.UserEmail,
+						Symbol:      order.Symbol,
+						Size:        str,
+						Side:        string(order.Side),
+						MarginCoin:  "USDT",
+						OrderType:   "market",
+						Service:     "binance",
+						QuoteAmount: p,
+					}
+					_, err = new_order.SaveOrder(s.DB)
+					if err != nil {
+						log.Error(err)
+						return
+					}
 
 		if side == futures.SideTypeSell {
 			keys[i].OpenShort = v.OpenShort - 1
