@@ -166,7 +166,6 @@ func GetBinanceSize(symbol string, first_order float64) (float64, float64, error
 	return first_order / fprice, fprice, nil
 }
 
-
 func CheckBalance(val int) error {
 	if val < 200 {
 		return errors.New("Balance should be at least 200 USDT")
@@ -197,4 +196,29 @@ func DecryptKeys(api_key string, secret_key string, passphrase string, service s
 	}
 
 	return api_key, secret_key, passphrase, nil
+}
+
+func ConvertStrToFloat64(val string) float64 {
+	num, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return 0.0
+	}
+
+	return num
+}
+
+func ConvertStrToFloat32(val string) float32 {
+	num64, err := strconv.ParseFloat(val, 32)
+	if err != nil {
+		return 0.0
+	}
+
+	num32 := float32(num64)
+
+	if !math.IsInf(float64(num32), 0) {
+		return num32
+	}
+
+	return 0.0
 }

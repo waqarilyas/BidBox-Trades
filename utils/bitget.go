@@ -74,12 +74,10 @@ func PerformBitgetPositionQuery(apiKey, apiSecret, passphrase string, coin_pair 
 		return nil, err
 	}
 
-	productStr := coin_pair + "_SUMCBL"
-
 	var requiredPosition MarginData
 	for _, pos := range accountData.Data {
 
-		if pos.Symbol == productStr {
+		if pos.Symbol == coin_pair {
 			requiredPosition = pos
 			break
 		}

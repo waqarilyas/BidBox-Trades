@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	requests "github.com/amir-the-h/okex/requests/rest/trade"
+	"github.com/jinzhu/gorm"
 
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/amir-the-h/okex"
@@ -142,201 +143,271 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 }
 
 func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
-	fmt.Println("trade req for bitget", v.UserEmail)
-	if v.Service == "bitget" {
-		fmt.Println("trade service for bitget")
-		api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
-		if err != nil {
-			fmt.Println("error in decryptkeys: ", err)
-			return
-		}
-		order := models.OrderRequest{}
-		orderResp := models.OrderResponse{}
-
-		if trade_req.Long == 1 {
-			order.Side = "open_long"
-		} else {
-			order.Side = "open_short"
-		}
-
-		order.Symbol = trade_req.CoinPair
-		order.MarginCoin = "SUSDT"
-		size, p, err := utils.GetSize(order.Symbol, first_order)
-		if err != nil {
-			log.Fatal(err)
-			// fmt.Println(err, " for ", v.UserEmail)
-			return
-		}
-		order.Size = fmt.Sprintf("%f", size)
-		order.OrderType = "market"
-		// order.StopLoss = fmt.Sprintf("%F", (size * 0.8))
-		// fmt.Println("order size : " + order.Size)
-		// fmt.Println(order)
-		// order.TakeProfit = fmt.Sprintf("%F", (size * 1.1))
-		// // fmt.Println(order.TakeProfit)
-		go func() {
-			str, err := NewOrder(api_key, secret_key, passphrase, &order)
-			if err != nil {
-				log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
-				fmt.Println("failed order: ", err, " for ", v.UserEmail)
-				return
-			}
-
-			if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
-				log.Error("parse fail: " + err.Error() + " for " + v.UserEmail)
-				return
-			}
-
-			if orderResp.Code != "00000" {
-				log.Error(orderResp.Msg + " :: " + v.UserEmail)
-				return
-			}
-			sp := strings.Split(order.Side, "_")
-			new_order := models.Order{
-				Email:       v.UserEmail,
-				Symbol:      order.Symbol,
-				Size:        order.Size,
-				Side:        sp[1],
-				MarginCoin:  order.MarginCoin,
-				OrderType:   order.OrderType,
-				Service:     "bitget",
-				QuoteAmount: p,
-			}
-			_, error := new_order.SaveOrder(s.DB)
-			if err != nil {
-				log.Error("err saving order: " + error.Error() + " for " + v.UserEmail)
-				return
-			}
-			mutex.Lock()
-			if order.Side == "open_short" {
-				keys[i].OpenShort = v.OpenShort - 1
-				keys[i].Prev = "short"
-				go s.handleUpdate(&v, keys[i].OpenShort, "short")
-			} else if order.Side == "open_long" {
-				keys[i].OpenLong = v.OpenLong - 1
-				keys[i].Prev = "long"
-				go s.handleUpdate(&v, keys[i].OpenLong, "long")
-			}
-			mutex.Unlock()
-			res["client_id"] = orderResp.Data.ClientOid
-			res["order_id"] = orderResp.Data.OrderID
-			// fmt.Println("res order placed for " + v.UserEmail)
-			// fmt.Println(res)
-		}()
-	} else {
-		// fmt.Println("trade service for bitget not found")
+	api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
+	if err != nil {
+		fmt.Println("error in decryptkeys: ", err)
+		return
 	}
-}
 
-func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter, keys []models.Key) {
-	// fmt.Println("trade req for binance")
-	if v.Service == "binance" {
-		fmt.Println("trade service for binance")
-		futures.UseTestnet = true
-		api_key, secret_key, _, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
+	order := models.OrderRequest{}
+	orderResp := models.OrderResponse{}
+
+	if trade_req.Long == 1 {
+		order.Side = "open_long"
+	} else {
+		order.Side = "open_short"
+	}
+
+	order.Symbol = trade_req.CoinPair
+	order.MarginCoin = "SUSDT"
+	size, p, err := utils.GetSize(order.Symbol, first_order)
+	if err != nil {
+		log.Fatal(err)
+		// fmt.Println(err, " for ", v.UserEmail)
+		return
+	}
+	order.Size = fmt.Sprintf("%f", size)
+	order.OrderType = "market"
+	// order.StopLoss = fmt.Sprintf("%F", (size * 0.8))
+	// fmt.Println("order size : " + order.Size)
+	// fmt.Println(order)
+	// order.TakeProfit = fmt.Sprintf("%F", (size * 1.1))
+	// // fmt.Println(order.TakeProfit)
+	go func() {
+		str, err := NewOrder(api_key, secret_key, passphrase, &order)
 		if err != nil {
-			fmt.Println("error in decryptkeys: ", err)
+			log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
+			fmt.Println("failed order: ", err, " for ", v.UserEmail)
 			return
 		}
-		// api_key, secret_key, _ := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
-		BinanceClient := futures.NewClient(api_key, secret_key)
-		// symbol := strings.Split(trade_req.CoinPair, "_")[0]
-		symbol2 := trade_req.CoinPair
-		switch symbol2 {
-		case "BTCUSDT":
-			symbol2 = "SBTCSUSDT_SUMCBL"
-		case "EOSUSDT":
-			symbol2 = "SEOSSUSDT_SUMCBL"
-		case "XRPUSDT":
-			symbol2 = "SXRPSUSDT_SUMCBL"
-		case "ETHUSDT":
-			symbol2 = "SETHSUSDT_SUMCBL"
-		default:
-			symbol2 = "SXRPSUSDT_SUMCBL"
-		}
-		x, p, err := utils.GetSize(symbol2, first_order)
 
-		if err != nil {
-			log.Error(err)
+		if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
+			log.Error("parse fail: " + err.Error() + " for " + v.UserEmail)
 			return
 		}
 
-		var str string
-		symbol := trade_req.CoinPair
-		switch symbol {
-		case "ETHUSDT":
-			symbol = "ETHUSDT"
-			str = fmt.Sprintf("%.3f", x)
-		case "EOSUSDT":
-			symbol = "EOSUSDT"
-			str = strconv.Itoa(int(math.Round(x)))
-		case "XRPUSDT":
-			symbol = "XRPUSDT"
-			str = strconv.Itoa(int(math.Round(x)))
-		case "BTCUSDT":
-			symbol = "BTCUSDT"
-			str = fmt.Sprintf("%.4f", x)
-			// fmt.Println("for coin BTCUSDT",str)
-		default:
-			symbol = "XRPUSDT"
-			str = "5"
-		}
-
-		var side futures.SideType
-
-		var positionSide futures.PositionSideType
-
-		if trade_req.Long == 1 {
-			side = futures.SideTypeBuy
-			positionSide = "LONG"
-		} else {
-			side = futures.SideTypeSell
-			positionSide = "SHORT"
-		}
-
-		strValue := fmt.Sprintf("%f", x)
-
-		order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-			Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
-			Quantity(strValue).
-			NewOrderResponseType(futures.NewOrderRespTypeRESULT).
-			Do(context.Background())
-		if err != nil {
-			log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
-			fmt.Println("error in create order", err)
+		if orderResp.Code != "00000" {
+			log.Error(orderResp.Msg + " :: " + v.UserEmail)
 			return
 		}
-		log.Println(order)
+
+		go fetchAndUpdateBitgetPosition(order, v, s.DB, api_key, secret_key, passphrase)
+
+		sp := strings.Split(order.Side, "_")
+
 		new_order := models.Order{
 			Email:       v.UserEmail,
 			Symbol:      order.Symbol,
-			Size:        str,
-			Side:        string(order.Side),
-			MarginCoin:  "USDT",
-			OrderType:   "market",
-			Service:     "binance",
+			Size:        order.Size,
+			Side:        sp[1],
+			MarginCoin:  order.MarginCoin,
+			OrderType:   order.OrderType,
+			Service:     "bitget",
 			QuoteAmount: p,
 		}
-		_, err = new_order.SaveOrder(s.DB)
+		_, error := new_order.SaveOrder(s.DB)
 		if err != nil {
-			log.Error(err)
+			log.Error("err saving order: " + error.Error() + " for " + v.UserEmail)
 			return
 		}
-
-		if side == futures.SideTypeSell {
+		mutex.Lock()
+		if order.Side == "open_short" {
 			keys[i].OpenShort = v.OpenShort - 1
 			keys[i].Prev = "short"
 			go s.handleUpdate(&v, keys[i].OpenShort, "short")
-		} else if side == futures.SideTypeBuy {
+		} else if order.Side == "open_long" {
 			keys[i].OpenLong = v.OpenLong - 1
 			keys[i].Prev = "long"
 			go s.handleUpdate(&v, keys[i].OpenLong, "long")
 		}
-		response.JSON(w, http.StatusOK, "trades made")
-		// fmt.Println("trade for binance made")
-	} else {
-		response.JSON(w, http.StatusBadRequest, "trades are not allowed for this user")
+		mutex.Unlock()
+		res["client_id"] = orderResp.Data.ClientOid
+		res["order_id"] = orderResp.Data.OrderID
+		// fmt.Println("res order placed for " + v.UserEmail)
+		// fmt.Println(res)
+	}()
+
+}
+
+func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *gorm.DB, api_key string, secret_key string, passphrase string) {
+	positionsResponse, err := utils.PerformBitgetPositionQuery(api_key, secret_key, passphrase, order.Symbol)
+	if err != nil {
+		fmt.Println("---error getting position data ---", err)
 	}
+
+	strLeverage := fmt.Sprintf("%d", positionsResponse.Leverage)
+	sp := strings.Split(order.Side, "_")
+
+	userPosition := models.Positions{
+		Symbol:       order.Symbol,
+		Leverage:     strLeverage,
+		OpenPrice:    positionsResponse.AverageOpenPrice,
+		LiqPrice:     positionsResponse.LiquidationPrice,
+		TakeProfit:   order.TakeProfit,
+		StopLoss:     order.StopLoss,
+		UnrealizedPl: positionsResponse.UnrealizedPL,
+		MarkPrice:    positionsResponse.MarketPrice,
+		Side:         sp[1],
+		Size:         order.Size,
+		Margin:       positionsResponse.Margin,
+		UserEmail:    v.UserEmail,
+		Status:       "opened",
+		Exchange:     "bitget",
+	}
+
+	posResponse, createErr := userPosition.UpdateOrCreatePosition(db)
+	if createErr != nil {
+		fmt.Println(userPosition, "---- error creating new position in database ----", createErr)
+		return
+	}
+	fmt.Println("---- position saved successfully---", posResponse)
+}
+
+func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter, keys []models.Key) {
+	if v.UserEmail != "kmtester@yopmail.com" {
+		return
+	}
+
+	futures.UseTestnet = true
+	api_key, secret_key, _, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
+	if err != nil {
+		fmt.Println("error in decryptkeys: ", err)
+		return
+	}
+
+	BinanceClient := futures.NewClient(api_key, secret_key)
+	symbol2 := trade_req.CoinPair
+
+	switch symbol2 {
+	case "BTCUSDT":
+		symbol2 = "SBTCSUSDT_SUMCBL"
+	case "EOSUSDT":
+		symbol2 = "SEOSSUSDT_SUMCBL"
+	case "XRPUSDT":
+		symbol2 = "SXRPSUSDT_SUMCBL"
+	case "ETHUSDT":
+		symbol2 = "SETHSUSDT_SUMCBL"
+	default:
+		symbol2 = "SXRPSUSDT_SUMCBL"
+	}
+
+	x, p, err := utils.GetSize(symbol2, first_order)
+
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	var str string
+	symbol := trade_req.CoinPair
+	switch symbol {
+	case "ETHUSDT":
+		symbol = "ETHUSDT"
+		str = fmt.Sprintf("%.3f", x)
+	case "EOSUSDT":
+		symbol = "EOSUSDT"
+		str = strconv.Itoa(int(math.Round(x)))
+	case "XRPUSDT":
+		symbol = "XRPUSDT"
+		str = strconv.Itoa(int(math.Round(x)))
+	case "BTCUSDT":
+		symbol = "BTCUSDT"
+		str = fmt.Sprintf("%.4f", x)
+		// fmt.Println("for coin BTCUSDT",str)
+	default:
+		symbol = "XRPUSDT"
+		str = "5"
+	}
+
+	var side futures.SideType
+
+	var positionSide futures.PositionSideType
+
+	if trade_req.Long == 1 {
+		side = futures.SideTypeBuy
+		positionSide = "LONG"
+	} else {
+		side = futures.SideTypeSell
+		positionSide = "SHORT"
+	}
+
+	strValue := fmt.Sprintf("%f", x)
+
+	order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
+		Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
+		Quantity(strValue).
+		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
+		Do(context.Background())
+	if err != nil {
+		log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
+		fmt.Println("error in create order", err)
+		return
+	}
+	log.Println(order)
+
+	go fetchAndUpdateBinancePosition(order, v, s.DB, api_key, secret_key, positionSide)
+
+	new_order := models.Order{
+		Email:       v.UserEmail,
+		Symbol:      order.Symbol,
+		Size:        str,
+		Side:        string(order.Side),
+		MarginCoin:  "USDT",
+		OrderType:   "market",
+		Service:     "binance",
+		QuoteAmount: p,
+	}
+	_, err = new_order.SaveOrder(s.DB)
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	if side == futures.SideTypeSell {
+		keys[i].OpenShort = v.OpenShort - 1
+		keys[i].Prev = "short"
+		go s.handleUpdate(&v, keys[i].OpenShort, "short")
+	} else if side == futures.SideTypeBuy {
+		keys[i].OpenLong = v.OpenLong - 1
+		keys[i].Prev = "long"
+		go s.handleUpdate(&v, keys[i].OpenLong, "long")
+	}
+	response.JSON(w, http.StatusOK, "trades made")
+	// fmt.Println("trade for binance made")
+
+}
+
+func fetchAndUpdateBinancePosition(order *futures.CreateOrderResponse, v models.Key, db *gorm.DB, api_key string, secret_key string, positionSide futures.PositionSideType) {
+	positionsResponse, err := utils.GetBinanceAccountOpenPositions(api_key, secret_key, order.Symbol)
+	if err != nil {
+		fmt.Println("---error getting position data ---", err)
+	}
+
+	side := strings.ToLower(string(positionSide))
+
+	userPosition := models.Positions{
+		Symbol:       order.Symbol,
+		Leverage:     positionsResponse.Leverage,
+		OpenPrice:    positionsResponse.EntryPrice,
+		LiqPrice:     positionsResponse.LiquidationPrice,
+		TakeProfit:   "",
+		StopLoss:     "",
+		UnrealizedPl: positionsResponse.UnrealizedProfit,
+		MarkPrice:    positionsResponse.MarkPrice,
+		Side:         side,
+		Size:         order.OrigQuantity,
+		Margin:       positionsResponse.InitialMargin,
+		UserEmail:    v.UserEmail,
+		Status:       "opened",
+		Exchange:     "binance",
+	}
+
+	posResponse, createErr := userPosition.UpdateOrCreatePosition(db)
+	if createErr != nil {
+		fmt.Println(userPosition, "---- error creating new position in database ----", createErr)
+		return
+	}
+	fmt.Println("---- position saved successfully---", posResponse)
 }
 
 func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
@@ -416,107 +487,149 @@ func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_or
 
 func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
 
-	if v.Service == "bybit" {
-
-		api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
-		if err != nil {
-			fmt.Println("error in decryptkeys: ", err)
-			return
-		}
-		// api_key, secret_key, passphrase := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
-		order := models.BybitOrderRequest{}
-		orderResp := models.BybitResponse{}
-		// fmt.Println("models")
-		if trade_req.Long == 1 {
-			order.Side = "Buy"
-		} else {
-			order.Side = "Sell"
-		}
-		order.Symbol = trade_req.CoinPair
-		symbol := trade_req.CoinPair
-		order.Category = "linear"
-		order.OrderType = "Market"
-		order.TimeInForce = "GoodTillCancel"
-		order.ReduceOnly = false
-		order.CloseOnTrigger = false
-		order.OrderType = "Market"
-		switch symbol {
-		case "BTCUSDT":
-			symbol = "SBTCSUSDT_SUMCBL"
-		case "EOSUSDT":
-			symbol = "SEOSSUSDT_SUMCBL"
-		case "XRPUSDT":
-			symbol = "SXRPSUSDT_SUMCBL"
-		case "ETHUSDT":
-			symbol = "SETHSUSDT_SUMCBL"
-		default:
-			symbol = "SXRPSUSDT_SUMCBL"
-		}
-
-		size, p, err := utils.GetSize(symbol, first_order)
-
-		if err != nil {
-			log.Fatal(err)
-			fmt.Println(err, " in get size for ", v.UserEmail)
-			return
-		}
-		order.Qty = fmt.Sprintf("%f", size)
-		go func() {
-			str, err := BybitNewOrder2(api_key, secret_key, passphrase, &order)
-			if err != nil {
-				log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
-				return
-			}
-			if str == "" {
-				log.Error("empty response for " + v.UserEmail)
-				fmt.Println("empty response for " + v.UserEmail)
-				return
-			}
-			if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
-				log.Error("parse fail: " + err.Error() + " for " + v.UserEmail)
-				fmt.Println("parse fail: " + err.Error() + " for " + v.UserEmail)
-				return
-			}
-
-			if orderResp.RetCode != 0 {
-				log.Error(orderResp.RetMsg + " :: " + v.UserEmail)
-				fmt.Println("error in retCode")
-				return
-			}
-			new_order := models.Order{
-				Email:       v.UserEmail,
-				Symbol:      order.Symbol,
-				Size:        order.Qty,
-				Side:        order.Side,
-				MarginCoin:  "USDT",
-				OrderType:   order.OrderType,
-				Service:     "bybit",
-				QuoteAmount: p,
-			}
-			_, err = new_order.SaveOrder(s.DB)
-			if err != nil {
-				log.Error("err saving order: " + err.Error() + " for " + v.UserEmail)
-				fmt.Println("error in saving order: ", err)
-				return
-			}
-			if order.Side == "Buy" {
-				keys[i].OpenShort = v.OpenShort - 1
-				keys[i].Prev = "short"
-				go s.handleUpdate(&v, keys[i].OpenShort, "short")
-			} else if order.Side == "Sell" {
-				keys[i].OpenLong = v.OpenLong - 1
-				keys[i].Prev = "long"
-				go s.handleUpdate(&v, keys[i].OpenLong, "long")
-			}
-			// res["client_id"] = orderResp.Result.OrderID
-			// res["order_id"] = orderResp.Result.OrderLinkId
-			// fmt.Println("res order placed for " + v.UserEmail)
-			// fmt.Println(res)
-		}()
-	} else {
-		// fmt.Println("trade service for bybit not found")
+	if v.UserEmail != "kmtester@yopmail.com" {
+		return
 	}
 
+	api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
+	if err != nil {
+		fmt.Println("error in decryptkeys: ", err)
+		return
+	}
+
+	order := models.BybitOrderRequest{}
+	orderResp := models.BybitResponse{}
+
+	if trade_req.Long == 1 {
+		order.Side = "Buy"
+	} else {
+		order.Side = "Sell"
+	}
+	order.Symbol = trade_req.CoinPair
+	symbol := trade_req.CoinPair
+	order.Category = "linear"
+	order.OrderType = "Market"
+	order.TimeInForce = "GoodTillCancel"
+	order.ReduceOnly = false
+	order.CloseOnTrigger = false
+	order.OrderType = "Market"
+	switch symbol {
+	case "BTCUSDT":
+		symbol = "SBTCSUSDT_SUMCBL"
+	case "EOSUSDT":
+		symbol = "SEOSSUSDT_SUMCBL"
+	case "XRPUSDT":
+		symbol = "SXRPSUSDT_SUMCBL"
+	case "ETHUSDT":
+		symbol = "SETHSUSDT_SUMCBL"
+	default:
+		symbol = "SXRPSUSDT_SUMCBL"
+	}
+
+	size, p, err := utils.GetSize(symbol, first_order)
+
+	if err != nil {
+		log.Fatal(err)
+		fmt.Println(err, " in get size for ", v.UserEmail)
+		return
+	}
+	order.Qty = fmt.Sprintf("%f", size)
+	go func() {
+		str, err := BybitNewOrder2(api_key, secret_key, passphrase, &order)
+		if err != nil {
+			log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
+			return
+		}
+		if str == "" {
+			log.Error("empty response for " + v.UserEmail)
+			fmt.Println("empty response for " + v.UserEmail)
+			return
+		}
+		if err = json.Unmarshal([]byte(str), &orderResp); err != nil {
+			log.Error("parse fail: " + err.Error() + " for " + v.UserEmail)
+			fmt.Println("parse fail: " + err.Error() + " for " + v.UserEmail)
+			return
+		}
+
+		if orderResp.RetCode != 0 {
+			log.Error(orderResp.RetMsg + " :: " + v.UserEmail)
+			fmt.Println("error in retCode")
+			return
+		}
+
+		new_order := models.Order{
+			Email:       v.UserEmail,
+			Symbol:      order.Symbol,
+			Size:        order.Qty,
+			Side:        order.Side,
+			MarginCoin:  "USDT",
+			OrderType:   order.OrderType,
+			Service:     "bybit",
+			QuoteAmount: p,
+		}
+
+		side := "long"
+		if order.Side == "Sell" {
+			side = "short"
+		}
+
+		go fetchAndUpdateBybitPosition(order, v, s.DB, api_key, secret_key, side)
+
+		_, err = new_order.SaveOrder(s.DB)
+		if err != nil {
+			log.Error("err saving order: " + err.Error() + " for " + v.UserEmail)
+			fmt.Println("error in saving order: ", err)
+			return
+		}
+
+		if order.Side == "Buy" {
+			keys[i].OpenShort = v.OpenShort - 1
+			keys[i].Prev = "short"
+			go s.handleUpdate(&v, keys[i].OpenShort, "short")
+		} else if order.Side == "Sell" {
+			keys[i].OpenLong = v.OpenLong - 1
+			keys[i].Prev = "long"
+			go s.handleUpdate(&v, keys[i].OpenLong, "long")
+		}
+		// res["client_id"] = orderResp.Result.OrderID
+		// res["order_id"] = orderResp.Result.OrderLinkId
+		// fmt.Println("res order placed for " + v.UserEmail)
+		// fmt.Println(res)
+	}()
+}
+
+func fetchAndUpdateBybitPosition(order models.BybitOrderRequest, v models.Key, db *gorm.DB, api_key string, secret_key string, positionSide string) {
+
+	positionsResponse, err := utils.GetBybitAccountPositions(api_key, secret_key, order.Symbol)
+	if err != nil {
+		fmt.Println("---error getting position data ---", err)
+	}
+
+	side := strings.ToLower(string(positionSide))
+
+	userPosition := models.Positions{
+		Symbol:       order.Symbol,
+		Leverage:     positionsResponse.Leverage,
+		OpenPrice:    positionsResponse.AvgPrice,
+		LiqPrice:     positionsResponse.LiqPrice,
+		TakeProfit:   "",
+		StopLoss:     "",
+		UnrealizedPl: positionsResponse.UnrealisedPnl,
+		MarkPrice:    positionsResponse.MarkPrice,
+		Side:         side,
+		Size:         order.Qty,
+		Margin:       positionsResponse.PositionMM,
+		UserEmail:    v.UserEmail,
+		Status:       "opened",
+		Exchange:     "bybit",
+	}
+
+	posResponse, createErr := userPosition.UpdateOrCreatePosition(db)
+	if createErr != nil {
+		fmt.Println(userPosition, "---- error creating new position in database ----", createErr)
+		return
+	}
+	fmt.Println("---- position saved successfully---", posResponse)
 }
 
 func (t *TradeRequest) Validate() error {

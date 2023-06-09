@@ -26,7 +26,7 @@ type MarketEvent struct {
 }
 
 type Cache struct {
-	Positions []models.Position
+	Positions []models.Positions
 }
 
 func (s *Server) WebsocketTest() {
@@ -55,7 +55,7 @@ func (s *Server) WebsocketTest() {
 	// Start a goroutine to periodically update the cache
 	go func() {
 		for {
-			position := models.Position{}
+			position := models.Positions{}
 			positions, err := position.GetAllPositions(s.DB)
 			if err != nil {
 				log.Println("Error fetching positions:", err)
