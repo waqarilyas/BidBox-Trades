@@ -71,7 +71,18 @@ func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
 func (server *Server) Home(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, "Trade Service")
 }
+func GetExchangeSpecificKeys(server *Server, service string) []models.Key {
+	key := models.Key{}
+	keys, err := key.FindKeysByService(server.DB, service)
+	if err != nil {
+		log.Fatal("error getting keys")
+		emptyKeys := []models.Key{}
+		return emptyKeys
+	}
 
+	log.Info("retrieved keys")
+	return *keys
+}
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	res := make(map[string]string)
 
@@ -81,46 +92,48 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		response.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
-
+	keys := GetExchangeSpecificKeys(s, trade_req.Exchange)
+	fmt.Println("keys", keys)
 	err = trade_req.Validate()
 	if err != nil {
 		response.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
-
-	for i, v := range app_data.Keys_list { // for each user key
+	fmt.Println("started")
+	//	stop_loss := 0.8 * float64(300)
+	//take_profit := 1.1 * float64(300)
+	for i, v := range keys { // for each user key
 		go func(v models.Key, i int) {
-			fmt.Println("user: ", v.UserEmail)
+			if v.Service == trade_req.Exchange {
+				fmt.Println("user: ", v.UserEmail)
 
-			if trade_req.Long == 1 && v.OpenLong <= 0 {
-				return
+				if trade_req.Long == 1 && v.OpenLong <= 0 {
+					return
+				}
+				if trade_req.Long == 0 && v.OpenShort <= 0 {
+					return
+				}
+				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
+				cond := models.Conditions{}
+				c, err := cond.FindCondition(s.DB, val)
+				if err != nil {
+					log.Error(err)
+					return
+				}
+				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
+				switch trade_req.Exchange {
+				case "bitget":
+					go bitgetTrade(s, v, i, trade_req, first_order, res, keys)
+				case "binance":
+					go binanceTrade(s, v, i, trade_req, first_order, res, w, keys)
+				case "okex":
+					go okexTrade(s, v, i, trade_req, first_order, res, keys)
+				case "bybit":
+					go bybitTrade(s, v, i, trade_req, first_order, res, keys)
+				default:
+					log.Println("Invalid exchange specified")
+				}
 			}
-			if trade_req.Long == 0 && v.OpenShort <= 0 {
-				return
-			}
-
-			val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
-			cond := models.Conditions{}
-			c, err := cond.FindCondition(s.DB, val)
-			if err != nil {
-				log.Error(err)
-				return
-			}
-
-			first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
-			switch trade_req.Exchange {
-			case "bitget":
-				go bitgetTrade(s, v, i, trade_req, first_order, res)
-			case "binance":
-				go binanceTrade(s, v, i, trade_req, first_order, res, w)
-			case "okex":
-				go okexTrade(s, v, i, trade_req, first_order, res)
-			case "bybit":
-				go bybitTrade(s, v, i, trade_req, first_order, res)
-			default:
-				log.Println("Invalid exchange specified")
-			}
-
 		}(v, i)
 	}
 
@@ -128,8 +141,8 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string) {
-
+func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
+	fmt.Println("trade req for bitget", v.UserEmail)
 	if v.Service == "bitget" {
 		fmt.Println("trade service for bitget")
 		api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
@@ -196,13 +209,13 @@ func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_
 			}
 			mutex.Lock()
 			if order.Side == "open_short" {
-				app_data.Keys_list[i].OpenShort = v.OpenShort - 1
-				app_data.Keys_list[i].Prev = "short"
-				go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
+				keys[i].OpenShort = v.OpenShort - 1
+				keys[i].Prev = "short"
+				go s.handleUpdate(&v, keys[i].OpenShort, "short")
 			} else if order.Side == "open_long" {
-				app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-				app_data.Keys_list[i].Prev = "long"
-				go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+				keys[i].OpenLong = v.OpenLong - 1
+				keys[i].Prev = "long"
+				go s.handleUpdate(&v, keys[i].OpenLong, "long")
 			}
 			mutex.Unlock()
 			res["client_id"] = orderResp.Data.ClientOid
@@ -215,7 +228,7 @@ func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_
 	}
 }
 
-func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter) {
+func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter, keys []models.Key) {
 	// fmt.Println("trade req for binance")
 	if v.Service == "binance" {
 		fmt.Println("trade service for binance")
@@ -311,13 +324,13 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		}
 
 		if side == futures.SideTypeSell {
-			app_data.Keys_list[i].OpenShort = v.OpenShort - 1
-			app_data.Keys_list[i].Prev = "short"
-			go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
+			keys[i].OpenShort = v.OpenShort - 1
+			keys[i].Prev = "short"
+			go s.handleUpdate(&v, keys[i].OpenShort, "short")
 		} else if side == futures.SideTypeBuy {
-			app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-			app_data.Keys_list[i].Prev = "long"
-			go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+			keys[i].OpenLong = v.OpenLong - 1
+			keys[i].Prev = "long"
+			go s.handleUpdate(&v, keys[i].OpenLong, "long")
 		}
 		response.JSON(w, http.StatusOK, "trades made")
 		// fmt.Println("trade for binance made")
@@ -326,7 +339,7 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 	}
 }
 
-func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string) {
+func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
 	// fmt.Println("trade req for okex")
 	if v.Service == "okx" {
 		// fmt.Println("trade service for okex")
@@ -384,13 +397,13 @@ func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_or
 		if res.Code == 0 {
 			log.Println("Trade made for " + symbol + " : " + v.UserEmail)
 			if side == okex.OrderSell {
-				app_data.Keys_list[i].OpenShort = v.OpenShort - 1
-				app_data.Keys_list[i].Prev = "short"
-				go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
+				keys[i].OpenShort = v.OpenShort - 1
+				keys[i].Prev = "short"
+				go s.handleUpdate(&v, keys[i].OpenShort, "short")
 			} else if side == okex.OrderBuy {
-				app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-				app_data.Keys_list[i].Prev = "long"
-				go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+				keys[i].OpenLong = v.OpenLong - 1
+				keys[i].Prev = "long"
+				go s.handleUpdate(&v, keys[i].OpenLong, "long")
 			}
 
 		} else {
@@ -401,7 +414,7 @@ func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_or
 	}
 }
 
-func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string) {
+func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
 
 	if v.Service == "bybit" {
 
@@ -487,13 +500,13 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 				return
 			}
 			if order.Side == "Buy" {
-				app_data.Keys_list[i].OpenShort = v.OpenShort - 1
-				app_data.Keys_list[i].Prev = "short"
-				go s.handleUpdate(&v, app_data.Keys_list[i].OpenShort, "short")
+				keys[i].OpenShort = v.OpenShort - 1
+				keys[i].Prev = "short"
+				go s.handleUpdate(&v, keys[i].OpenShort, "short")
 			} else if order.Side == "Sell" {
-				app_data.Keys_list[i].OpenLong = v.OpenLong - 1
-				app_data.Keys_list[i].Prev = "long"
-				go s.handleUpdate(&v, app_data.Keys_list[i].OpenLong, "long")
+				keys[i].OpenLong = v.OpenLong - 1
+				keys[i].Prev = "long"
+				go s.handleUpdate(&v, keys[i].OpenLong, "long")
 			}
 			// res["client_id"] = orderResp.Result.OrderID
 			// res["order_id"] = orderResp.Result.OrderLinkId

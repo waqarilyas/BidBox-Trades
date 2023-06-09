@@ -138,6 +138,35 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 	return first_order / fprice, fprice, nil
 }
 
+func GetBinanceSize(symbol string, first_order float64) (float64, float64, error) {
+	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
+
+	client := http.Client{}
+
+	res, err := client.Get(url)
+	if err != nil {
+		return 0, 0, err
+	}
+	defer res.Body.Close()
+
+	price := IndexPriceReq{}
+	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
+		return 0, 0, err
+	}
+
+	if price.Code != "00000" {
+		return 0, 0, errors.New(price.Msg)
+	}
+
+	fprice, err := strconv.ParseFloat(price.Data.Index, 64)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return first_order / fprice, fprice, nil
+}
+
+
 func CheckBalance(val int) error {
 	if val < 200 {
 		return errors.New("Balance should be at least 200 USDT")
