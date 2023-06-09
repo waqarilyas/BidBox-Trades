@@ -56,6 +56,20 @@ func (server *Server) InitKeys() {
 	app_data.Keys_list = *keys
 }
 
+func (server *Server) GetExchangeSpecificKeys(service string) ([]models.Key) {
+	key := models.Key{}
+	keys, err := key.FindKeysByService(server.DB, service)
+	if err != nil {
+		log.Fatal("error getting keys")
+		app_data.Keys_list = []models.Key{}
+		return []models.Key{}
+	}
+
+	log.Info("retrieved keys")
+	return *keys
+}
+
+
 func (server *Server) InitConditions() {
 	cond := models.Conditions{}
 	conds, err := cond.FindAllConditions(server.DB)

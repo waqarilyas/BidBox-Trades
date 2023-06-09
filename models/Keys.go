@@ -30,6 +30,15 @@ func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
 	}
 	return &Keys, nil
 }
+func (u *Key) FindKeysByService(db *gorm.DB, service string) (*[]Key, error) {
+	Keys := []Key{}
+	err := db.Model(&Key{}).Where("service = ?", service).Limit(100).Find(&Keys).Error
+	if err != nil {
+		return &[]Key{}, err
+	}
+	return &Keys, nil
+}
+
 
 func (u *Key) FindKeyById(db *gorm.DB, kid uuid.UUID) (*Key, error) {
 	err := db.Model(Key{}).Where("keyid = ?", kid).Take(&u).Error
