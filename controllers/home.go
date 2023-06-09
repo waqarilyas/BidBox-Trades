@@ -334,7 +334,7 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 	strValue := fmt.Sprintf("%f", x)
 
 	order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-		Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
+		Side(side).Type(futures.OrderTypeMarket).
 		Quantity(strValue).
 		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
 		Do(context.Background())
