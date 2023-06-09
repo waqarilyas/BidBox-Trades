@@ -6,8 +6,9 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/kryptomind/bidboxapi/KeyService/helpers"
-)
+	"github.com/kryptomind/BidBox-Trades/helpers"
+	// "github.com/kryptomind/bidboxapi/KeyService/helpers"
+)	
 
 type MarginData struct {
 	MarginCoin        string `json:"marginCoin"`
