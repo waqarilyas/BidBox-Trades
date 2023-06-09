@@ -253,18 +253,18 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 
 					var side futures.SideType
 
-					var positionSide futures.PositionSideType
+					// var positionSide futures.PositionSideType
 
 					if trade_req.Long == 1 {
 						side = futures.SideTypeBuy
-						positionSide = "LONG"
+						// positionSide = "LONG"
 					} else {
 						side = futures.SideTypeSell
-						positionSide = "SHORT"
+						// positionSide = "SHORT"
 					}
 					strValue := fmt.Sprintf("%f", x)
 					order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-						Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
+						Side(side).Type(futures.OrderTypeMarket).
 						Quantity(strValue).
 						NewOrderResponseType(futures.NewOrderRespTypeRESULT).
 						Do(context.Background())
