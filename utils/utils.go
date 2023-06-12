@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+
 	// "io/ioutil"
 
 	helpers "github.com/WAQAR5/bitget-helpers"
@@ -144,26 +145,25 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 	return first_order / fprice, fprice, nil
 }
 func BinanceRequest(symbol string) (string, error) {
-	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"
-  method := "GET"
-  
-  client := &http.Client {
-}
-req, err := http.NewRequest(method, url, nil)
+	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + symbol
+	method := "GET"
 
-if err != nil {
-	fmt.Println(err)
-    return "", err
-}
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, nil)
 
-req.Header.Add("Content-Type", "application/json")
-  res, err := client.Do(req)
-  if err != nil {
-    fmt.Println(err)
-	return "", err
-  }
-  defer res.Body.Close()
-  price := IndexPriceReqBinance{}
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+	defer res.Body.Close()
+	price := IndexPriceReqBinance{}
 	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
 		return "", err
 	}
@@ -180,8 +180,6 @@ func GetBinanceSize(symbol string, first_order float64) (float64, float64, error
 	}
 	return first_order / fprice, fprice, nil
 }
-
-
 
 func CheckBalance(val int) error {
 	if val < 200 {

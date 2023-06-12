@@ -17,13 +17,14 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/amir-the-h/okex"
 	"github.com/amir-the-h/okex/api"
+
 	// "github.com/kryptomind/BidBox-Trades/exchange/binance"
 	// "github.com/kryptomind/BidBox-Trades/helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
 	log "github.com/sirupsen/logrus"
-)	
+)
 
 var mutex sync.Mutex
 
@@ -60,8 +61,8 @@ type TradeRequest struct {
 }
 
 const (
-	TAKE_PROFIT_PERCENTAGE = 80
-	STOP_LOSS_PERCENTAGE   = 80
+	TAKE_PROFIT_PERCENTAGE = 20.0
+	STOP_LOSS_PERCENTAGE   = 20.0
 )
 
 func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
@@ -121,7 +122,7 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 				if trade_req.Long == 0 && v.OpenShort <= 0 {
 					return
 				}
-				val := int(math.Floor(float64(v.TradeAmount)/100) * 100)
+				val := int(math.Floor(float64(v.TradeAmount)/100.0) * 100)
 				cond := models.Conditions{}
 				c, err := cond.FindCondition(s.DB, val)
 				if err != nil {
@@ -285,18 +286,6 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 	BinanceClient := futures.NewClient(api_key, secret_key)
 	symbol2 := trade_req.CoinPair
 
-	switch symbol2 {
-	case "BTCUSDT":
-		symbol2 = "SBTCSUSDT_SUMCBL"
-	case "EOSUSDT":
-		symbol2 = "SEOSSUSDT_SUMCBL"
-	case "XRPUSDT":
-		symbol2 = "SXRPSUSDT_SUMCBL"
-	case "ETHUSDT":
-		symbol2 = "SETHSUSDT_SUMCBL"
-	default:
-		symbol2 = "SXRPSUSDT_SUMCBL"
-	}
 	x, p, err := utils.GetBinanceSize(symbol2, first_order)
 
 	if err != nil {
@@ -325,40 +314,66 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		str = "5"
 	}
 
+	accountPositionMode, err := utils.GetBinanceAccountPositionMode(api_key, secret_key)
+
+	if err != nil {
+		fmt.Println("--- error while getting user position mode ---", err)
+	}
+
+	fmt.Println("--- account Position mdoe ----", accountPositionMode)
+
 	var side futures.SideType
 
 	var positionSide futures.PositionSideType
-
-	stopLossValue := 0.0
-	takeProfitValue := 0.0
+	var stopLossValue float64
+	var takeProfitValue float64
 
 	if trade_req.Long == 1 {
 		side = futures.SideTypeBuy
 		positionSide = "LONG"
 
-		stopLossValue = p * (1 - STOP_LOSS_PERCENTAGE/100)
-		takeProfitValue = p * (1 + TAKE_PROFIT_PERCENTAGE/100)
+		stopLossValue = p * 1.2
+		takeProfitValue = p * 0.8
 
 	} else {
 		side = futures.SideTypeSell
 		positionSide = "SHORT"
 
-		stopLossValue = p * (1 + STOP_LOSS_PERCENTAGE/100)
-		takeProfitValue = p * (1 - TAKE_PROFIT_PERCENTAGE/100)
+		stopLossValue = p * (1 + STOP_LOSS_PERCENTAGE/100.0)
+		takeProfitValue = p * (1 - TAKE_PROFIT_PERCENTAGE/100.0)
 	}
 
-	strValue := fmt.Sprintf("%f", x)
-	strStopLoss := fmt.Sprintf("%f", stopLossValue)
-	strTakeProfit := fmt.Sprintf("%f", takeProfitValue)
+	if accountPositionMode.DualSidePosition {
+		positionSide = "BOTH"
+	}
+
+	strValue := strconv.FormatFloat(x, 'f', 3, 64)
+	// strStopLoss := fmt.Sprintf("%f", stopLossValue)
+	// strTakeProfit := fmt.Sprintf("%f", takeProfitValue)
+
+	// minDistance := 0.001 // Adjust this value as per Binance's requirements
+	// stopLossValue -= minDistance
+	// takeProfitValue += minDistance
+
+	// strStopLoss := strconv.FormatFloat(stopLossValue, 'f', 2, 64)
+	strTakeProfit := strconv.FormatFloat(takeProfitValue, 'f', 2, 64)
+
+	fmt.Println(stopLossValue)
+
+	// stopPrice, err := BinanceClient.GetAvgPrice(symbol)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	order, err := BinanceClient.NewCreateOrderService().
 		Symbol(symbol).
-		StopPrice(strStopLoss).
 		Side(side).
-		Type(futures.OrderTypeStopMarket).
-		ActivationPrice(strTakeProfit).
+		StopPrice(strTakeProfit).
+		PositionSide(positionSide).
+		Type(futures.OrderTypeTakeProfitMarket).
 		Quantity(strValue).
 		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
+		TimeInForce(futures.TimeInForceTypeGTC).
 		Do(context.Background())
 
 	if err != nil {
@@ -696,7 +711,7 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 		return
 	}
 	// checking if user has sufficient balance
-	err := key.ValidateBalance(s.DB,email,service,data["trade_amount"])
+	err := key.ValidateBalance(s.DB, email, service, data["trade_amount"])
 	if err != nil {
 		response.ERROR(w, http.StatusBadRequest, errors.New("Insufficient Balance"))
 		return

@@ -41,6 +41,10 @@ type BinanceErrorResponse struct {
 	Msg  string `json:"msg"`
 }
 
+type BinancePositionMode struct {
+	DualSidePosition bool `json:"dualSidePosition"`
+}
+
 func GetBinanceAccountOpenPositions(apiKey string, secret string, coinPair string) (*Position, error) {
 	timestamp := time.Now().UnixNano() / int64(time.Millisecond)
 
@@ -96,4 +100,61 @@ func GetBinanceAccountOpenPositions(apiKey string, secret string, coinPair strin
 	}
 
 	return &requiredPosition, nil
+}
+
+func GetBinanceAccountPositionMode(apiKey string, secret string) (*BinancePositionMode, error) {
+	timestamp := time.Now().UnixNano() / int64(time.Millisecond)
+
+	params := map[string]string{
+		"timestamp": strconv.FormatInt(timestamp, 10),
+	}
+
+	accSignature := GenerateBinanceSignature(params, secret)
+	finalURL := BinanceAPIEndpoint + "/dapi/v1/positionSide/dual?timestamp=" + strconv.FormatInt(timestamp, 10) + "&signature=" + accSignature
+
+	req, err := http.NewRequest("GET", finalURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-MBX-APIKEY", apiKey)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResponse BinanceErrorResponse
+		err = json.Unmarshal(body, &errorResponse)
+		if err != nil {
+			return nil, err
+		}
+		return nil, errors.New(errorResponse.Msg)
+	}
+
+	var positionMode BinancePositionMode
+
+	err = json.Unmarshal(body, &positionMode)
+	if err != nil {
+		return nil, err
+	}
+
+	// var requiredPosition Position
+	// for _, pos := range positions {
+
+	// 	if pos.Symbol == coinPair {
+	// 		requiredPosition = pos
+	// 		break
+	// 	}
+	// }
+
+	return &positionMode, nil
 }
