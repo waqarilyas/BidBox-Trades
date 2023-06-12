@@ -17,11 +17,13 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/amir-the-h/okex"
 	"github.com/amir-the-h/okex/api"
+	// "github.com/kryptomind/BidBox-Trades/exchange/binance"
+	// "github.com/kryptomind/BidBox-Trades/helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
 	log "github.com/sirupsen/logrus"
-)
+)	
 
 var mutex sync.Mutex
 
@@ -290,8 +292,7 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 	default:
 		symbol2 = "SXRPSUSDT_SUMCBL"
 	}
-
-	x, p, err := utils.GetSize(symbol2, first_order)
+	x, p, err := utils.GetBinanceSize(symbol2, first_order)
 
 	if err != nil {
 		log.Error(err)
@@ -647,7 +648,7 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 		return
 	}
 
-	if service != "bitget" && service != "binance" && service != "okx" {
+	if service != "bitget" && service != "binance" && service != "bybit" {
 		response.ERROR(w, http.StatusBadRequest, errors.New("service not supported"))
 		return
 	}
@@ -659,7 +660,7 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 	var data map[string]int
 
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		response.ERROR(w, http.StatusInternalServerError, err)
+		response.ERROR(w, http.StatusInternalServerError, errors.New("error decoding request body"))
 		return
 	}
 
@@ -672,7 +673,12 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 		response.ERROR(w, http.StatusBadRequest, errors.New("minimum amount must be 200"))
 		return
 	}
-
+	// checking if user has sufficient balance
+	err := key.ValidateBalance(s.DB,email,service,data["trade_amount"])
+	if err != nil {
+		response.ERROR(w, http.StatusBadRequest, errors.New("Insufficient Balance"))
+		return
+	}
 	keys, err := key.ChangeTradeAmount(s.DB, data["trade_amount"])
 	if err != nil {
 		response.ERROR(w, http.StatusInternalServerError, err)
