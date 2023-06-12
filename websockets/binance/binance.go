@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,10 @@ type MarketEvent struct {
 type Cache struct {
 	Positions []models.Positions
 }
+
+const (
+	PERCENT_CHANGE = 5
+)
 
 func (s *Server) WebsocketTest() {
 	var paramsList []string
@@ -56,7 +61,7 @@ func (s *Server) WebsocketTest() {
 	go func() {
 		for {
 			position := models.Positions{}
-			positions, err := position.GetAllPositions(s.DB)
+			positions, err := position.GetOpenPositionsByExchange(s.DB, "binance")
 			if err != nil {
 				log.Println("Error fetching positions:", err)
 			} else {
@@ -152,12 +157,65 @@ func handleWebSocketMessages(conn *websocket.Conn, db *gorm.DB, cache *Cache) {
 }
 
 func handleMarketUpdate(db *gorm.DB, cache *Cache, coinPair string, marketPrice string) {
-	fmt.Println("---- coin pair ----", coinPair, " ---- ", marketPrice)
+	// fmt.Println("🚀 ~ file: binance.go:156 ~ funchandleMarketUpdate ~ coinPair:", coinPair)
 
-	// Access positions from the cache
 	positions := cache.Positions
 
-	fmt.Println("--- routine handled successfully ---", positions)
+	var symbolPositions []models.Positions
 
-	// for
+	for _, pos := range positions {
+		if pos.Symbol == coinPair {
+			symbolPositions = append(symbolPositions, pos)
+		}
+	}
+
+	for _, filteredPos := range symbolPositions {
+		go handlePositionOnRateUpdate(filteredPos, marketPrice)
+	}
+
+}
+
+func handlePositionOnRateUpdate(position models.Positions, marketPrice string) {
+	lastUpdatePrice := position.OpenPrice
+
+	if position.LastUpdatePrice != "" {
+		lastUpdatePrice = position.LastUpdatePrice
+	}
+
+	flEntryPrice, err := strconv.ParseFloat(lastUpdatePrice, 64)
+	if err != nil {
+		fmt.Println("--- unable to convert entryprice to float ---", err)
+	}
+
+	flMarketPriceFloat, err := strconv.ParseFloat(marketPrice, 64)
+	if err != nil {
+		fmt.Println("--- unable to convert marketPrice to float ---", err)
+	}
+
+	percentage_change := (flMarketPriceFloat - flEntryPrice) / flEntryPrice * 100
+
+	switch position.Side {
+	case "long":
+		if percentage_change > 1 {
+			fmt.Println(position.Symbol, "--- long position", "---- percentage change ----", percentage_change)
+			take_profit := flEntryPrice * (1 - PERCENT_CHANGE/100)
+			fmt.Println("--- take profit for long position at ----", take_profit)
+
+		}
+
+	case "short":
+		if percentage_change < -1 {
+			// update TP/SL here
+			fmt.Println(position.Symbol, "--- short position", "---- percentage change ----", percentage_change)
+			take_profit := flEntryPrice * (1 - PERCENT_CHANGE/100)
+			fmt.Println("--- take profit for short position at ----", take_profit)
+
+		}
+
+	default:
+		fmt.Println("--- defaault case reached ----")
+	}
+
+	// fmt.Println("--- last update rate ---", lastUpdatePrice)
+
 }

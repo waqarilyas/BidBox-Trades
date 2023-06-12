@@ -7,23 +7,24 @@ import (
 )
 
 type Positions struct {
-	Id           int       `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
-	CreatedAt    time.Time `gorm:"type:timestamptz;default:now()" json:"created_at"`
-	UpdatedAt    time.Time `gorm:"type:timestamptz;default:now()" json:"updated_at"`
-	Symbol       string    `json:"symbol"`
-	Leverage     string    `json:"leverage"`
-	OpenPrice    string    `json:"open_price"`
-	LiqPrice     string    `json:"liq_price"`
-	TakeProfit   string    `json:"take_profit"`
-	MarkPrice    string    `json:"mark_price"`
-	StopLoss     string    `json:"stop_loss"`
-	UnrealizedPl string    `json:"unrealized_pl"`
-	Side         string    `json:"side"`
-	Size         string    `json:"size"`
-	Margin       string    `json:"margin"`
-	UserEmail    string    `gorm:"not null" json:"user_email"`
-	Status       string    `gorm:"default:'opened'" json:"status"`
-	Exchange     string    `json:"exchange"`
+	Id              int       `gorm:"primary_key;AUTO_INCREMENT" json:"id"`
+	CreatedAt       time.Time `gorm:"type:timestamptz;default:now()" json:"created_at"`
+	UpdatedAt       time.Time `gorm:"type:timestamptz;default:now()" json:"updated_at"`
+	Symbol          string    `json:"symbol"`
+	Leverage        string    `json:"leverage"`
+	OpenPrice       string    `json:"open_price"`
+	LiqPrice        string    `json:"liq_price"`
+	TakeProfit      string    `json:"take_profit"`
+	MarkPrice       string    `json:"mark_price"`
+	StopLoss        string    `json:"stop_loss"`
+	UnrealizedPl    string    `json:"unrealized_pl"`
+	Side            string    `json:"side"`
+	Size            string    `json:"size"`
+	Margin          string    `json:"margin"`
+	UserEmail       string    `gorm:"not null" json:"user_email"`
+	Status          string    `gorm:"default:'opened'" json:"status"`
+	Exchange        string    `json:"exchange"`
+	LastUpdatePrice string    `json:"last_update_price"`
 }
 
 func (position *Positions) CreateNewPosition(db *gorm.DB) (*Positions, error) {
@@ -34,9 +35,9 @@ func (position *Positions) CreateNewPosition(db *gorm.DB) (*Positions, error) {
 	return position, nil
 }
 
-func (u *Positions) GetAllPositions(db *gorm.DB) (*[]Positions, error) {
+func (u *Positions) GetOpenPositionsByExchange(db *gorm.DB, exchange string) (*[]Positions, error) {
 	positions := []Positions{}
-	err := db.Model(&Key{}).Limit(100).Find(&positions).Error
+	err := db.Model(&Positions{}).Where("exchange = ? AND status = ?", exchange, "opened").Find(&positions).Error
 	if err != nil {
 		return &[]Positions{}, err
 	}

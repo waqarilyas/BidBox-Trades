@@ -57,6 +57,11 @@ type TradeRequest struct {
 	Exchange string `json:"exchange"`
 }
 
+const (
+	TAKE_PROFIT_PERCENTAGE = 80
+	STOP_LOSS_PERCENTAGE   = 80
+)
+
 func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
 	key, err := key.ChangePositions(s.DB, val, pos)
 	if err != nil {
@@ -323,21 +328,38 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 
 	var positionSide futures.PositionSideType
 
+	stopLossValue := 0.0
+	takeProfitValue := 0.0
+
 	if trade_req.Long == 1 {
 		side = futures.SideTypeBuy
 		positionSide = "LONG"
+
+		stopLossValue = p * (1 - STOP_LOSS_PERCENTAGE/100)
+		takeProfitValue = p * (1 + TAKE_PROFIT_PERCENTAGE/100)
+
 	} else {
 		side = futures.SideTypeSell
 		positionSide = "SHORT"
+
+		stopLossValue = p * (1 + STOP_LOSS_PERCENTAGE/100)
+		takeProfitValue = p * (1 - TAKE_PROFIT_PERCENTAGE/100)
 	}
 
 	strValue := fmt.Sprintf("%f", x)
+	strStopLoss := fmt.Sprintf("%f", stopLossValue)
+	strTakeProfit := fmt.Sprintf("%f", takeProfitValue)
 
-	order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-		Side(side).Type(futures.OrderTypeMarket).
+	order, err := BinanceClient.NewCreateOrderService().
+		Symbol(symbol).
+		StopPrice(strStopLoss).
+		Side(side).
+		Type(futures.OrderTypeStopMarket).
+		ActivationPrice(strTakeProfit).
 		Quantity(strValue).
 		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
 		Do(context.Background())
+
 	if err != nil {
 		log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
 		fmt.Println("error in create order", err)
