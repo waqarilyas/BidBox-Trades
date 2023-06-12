@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"time"
+	// "io/ioutil"
 
 	helpers "github.com/WAQAR5/bitget-helpers"
 )
@@ -77,6 +78,11 @@ type IndexPriceReq struct {
 	Msg         string `json:"msg"`
 	RequestTime int64  `json:"requestTime"`
 }
+type IndexPriceReqBinance struct {
+	Symbol string `json:"symbol"`
+	Price  string `json:"price"`
+	Time   int64  `json:"time"`
+}
 
 func GetSize(symbol string, first_order float64) (float64, float64, error) {
 	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
@@ -137,34 +143,45 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 
 	return first_order / fprice, fprice, nil
 }
+func BinanceRequest(symbol string) (string, error) {
+	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"
+  method := "GET"
+  
+  client := &http.Client {
+}
+req, err := http.NewRequest(method, url, nil)
 
-func GetBinanceSize(symbol string, first_order float64) (float64, float64, error) {
-	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
+if err != nil {
+	fmt.Println(err)
+    return "", err
+}
 
-	client := http.Client{}
-
-	res, err := client.Get(url)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer res.Body.Close()
-
-	price := IndexPriceReq{}
+req.Header.Add("Content-Type", "application/json")
+  res, err := client.Do(req)
+  if err != nil {
+    fmt.Println(err)
+	return "", err
+  }
+  defer res.Body.Close()
+  price := IndexPriceReqBinance{}
 	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
-		return 0, 0, err
+		return "", err
 	}
-
-	if price.Code != "00000" {
-		return 0, 0, errors.New(price.Msg)
-	}
-
-	fprice, err := strconv.ParseFloat(price.Data.Index, 64)
+	return price.Price, nil
+}
+func GetBinanceSize(symbol string, first_order float64) (float64, float64, error) {
+	binancePrice, err := BinanceRequest(symbol)
 	if err != nil {
 		return 0, 0, err
 	}
-
+	fprice, err := strconv.ParseFloat(binancePrice, 64)
+	if err != nil {
+		return 0, 0, err
+	}
 	return first_order / fprice, fprice, nil
 }
+
+
 
 func CheckBalance(val int) error {
 	if val < 200 {
