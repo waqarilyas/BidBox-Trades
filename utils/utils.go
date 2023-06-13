@@ -79,6 +79,7 @@ type IndexPriceReq struct {
 	Msg         string `json:"msg"`
 	RequestTime int64  `json:"requestTime"`
 }
+
 type IndexPriceReqBinance struct {
 	Symbol string `json:"symbol"`
 	Price  string `json:"price"`
@@ -117,6 +118,7 @@ func GetSize(symbol string, first_order float64) (float64, float64, error) {
 
 	return fixedAmount, fprice, nil
 }
+
 func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) {
 	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
 
@@ -144,6 +146,7 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 
 	return first_order / fprice, fprice, nil
 }
+
 func BinanceRequest(symbol string) (string, error) {
 	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + symbol
 	method := "GET"
