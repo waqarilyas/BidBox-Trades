@@ -18,8 +18,6 @@ import (
 	"github.com/amir-the-h/okex"
 	"github.com/amir-the-h/okex/api"
 
-	// "github.com/kryptomind/BidBox-Trades/exchange/binance"
-	// "github.com/kryptomind/BidBox-Trades/helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
