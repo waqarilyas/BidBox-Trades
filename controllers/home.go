@@ -270,9 +270,6 @@ func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *g
 }
 
 func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter, keys []models.Key) {
-	if v.UserEmail != "kmtester@yopmail.com" {
-		return
-	}
 
 	futures.UseTestnet = true
 	api_key, secret_key, _, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
@@ -281,7 +278,8 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		return
 	}
 
-	BinanceClient := futures.NewClient(api_key, secret_key)
+	// BinanceClient := futures.NewClient(api_key, secret_key)
+
 	symbol2 := trade_req.CoinPair
 
 	x, p, err := utils.GetBinanceSize(symbol2, first_order)
@@ -312,76 +310,41 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		str = "5"
 	}
 
-	accountPositionMode, err := utils.GetBinanceAccountPositionMode(api_key, secret_key)
+	BinanceClient := futures.NewClient(api_key, secret_key)
+	accountPositionMode, err := BinanceClient.NewGetPositionModeService().Do(context.Background())
 
 	if err != nil {
 		fmt.Println("--- error while getting user position mode ---", err)
 	}
 
-	fmt.Println("--- account Position mdoe ----", accountPositionMode)
-
 	var side futures.SideType
 
 	var positionSide futures.PositionSideType
-	var stopLossValue float64
-	var takeProfitValue float64
 
 	if trade_req.Long == 1 {
 		side = futures.SideTypeBuy
 		positionSide = "LONG"
-
-		stopLossValue = p * 1.2
-		takeProfitValue = p * 0.8
-
 	} else {
 		side = futures.SideTypeSell
 		positionSide = "SHORT"
-
-		stopLossValue = p * (1 + STOP_LOSS_PERCENTAGE/100.0)
-		takeProfitValue = p * (1 - TAKE_PROFIT_PERCENTAGE/100.0)
 	}
 
-	if accountPositionMode.DualSidePosition {
+	if !accountPositionMode.DualSidePosition {
 		positionSide = "BOTH"
 	}
 
 	strValue := strconv.FormatFloat(x, 'f', 3, 64)
-	// strStopLoss := fmt.Sprintf("%f", stopLossValue)
-	// strTakeProfit := fmt.Sprintf("%f", takeProfitValue)
 
-	// minDistance := 0.001 // Adjust this value as per Binance's requirements
-	// stopLossValue -= minDistance
-	// takeProfitValue += minDistance
-
-	// strStopLoss := strconv.FormatFloat(stopLossValue, 'f', 2, 64)
-	strTakeProfit := strconv.FormatFloat(takeProfitValue, 'f', 2, 64)
-
-	fmt.Println(stopLossValue)
-
-	// stopPrice, err := BinanceClient.GetAvgPrice(symbol)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-
-	order, err := BinanceClient.NewCreateOrderService().
-		Symbol(symbol).
-		Side(side).
-		StopPrice(strTakeProfit).
-		PositionSide(positionSide).
-		Type(futures.OrderTypeTakeProfitMarket).
-		Quantity(strValue).
-		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
-		TimeInForce(futures.TimeInForceTypeGTC).
-		Do(context.Background())
-
-	if err != nil {
+	ordersResponse, takeProfit, stopLoss, error := handleBinanceMultiOrder(api_key, secret_key, strValue, symbol, p, positionSide, side)
+	if error != nil {
 		log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
 		fmt.Println("error in create order", err)
 		return
 	}
-	log.Println(order)
 
-	go fetchAndUpdateBinancePosition(order, v, s.DB, api_key, secret_key, positionSide)
+	order := (ordersResponse.Orders[0])
+
+	go fetchAndUpdateBinancePosition(order, v, s.DB, api_key, secret_key, positionSide, takeProfit, stopLoss)
 
 	new_order := models.Order{
 		Email:       v.UserEmail,
@@ -408,12 +371,86 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		keys[i].Prev = "long"
 		go s.handleUpdate(&v, keys[i].OpenLong, "long")
 	}
+
 	response.JSON(w, http.StatusOK, "trades made")
-	// fmt.Println("trade for binance made")
 
 }
 
-func fetchAndUpdateBinancePosition(order *futures.CreateOrderResponse, v models.Key, db *gorm.DB, api_key string, secret_key string, positionSide futures.PositionSideType) {
+func handleBinanceMultiOrder(
+	api_key string,
+	secret_key string,
+	quantity string,
+	symbol string,
+	marketPrice float64,
+	position_side futures.PositionSideType,
+	side futures.SideType,
+) (*futures.CreateBatchOrdersResponse, float64, float64, error) {
+
+	BinanceClient := futures.NewClient(api_key, secret_key)
+	primaryOrder := futures.CreateOrderService{}
+
+	go BinanceClient.NewCancelAllOpenOrdersService().Symbol(symbol).Do(context.Background())
+
+	primaryOrder.PositionSide(position_side)
+	primaryOrder.Quantity(quantity)
+	primaryOrder.Symbol(symbol)
+	primaryOrder.Type(futures.OrderTypeMarket)
+	primaryOrder.Side(side)
+
+	var tpPrice float64
+	var slPrice float64
+
+	var tpSide futures.SideType
+	var slSide futures.SideType
+	if side == futures.SideTypeBuy {
+		tpPrice = marketPrice * (1 + TAKE_PROFIT_PERCENTAGE/100.0)
+		slPrice = marketPrice * (1 - STOP_LOSS_PERCENTAGE/100.0)
+
+		tpSide = futures.SideTypeSell
+		slSide = futures.SideTypeSell
+
+	} else if side == futures.SideTypeSell {
+		tpPrice = marketPrice * (1 - TAKE_PROFIT_PERCENTAGE/100.0)
+		slPrice = marketPrice * (1 + STOP_LOSS_PERCENTAGE/100.0)
+
+		tpSide = futures.SideTypeBuy
+		slSide = futures.SideTypeBuy
+	}
+
+	// Create TP order
+	tpOrder := futures.CreateOrderService{}
+	tpOrder.PositionSide(position_side)
+	tpOrder.Quantity(quantity)
+	tpOrder.Side(tpSide)
+	tpOrder.StopPrice(fmt.Sprintf("%.2f", tpPrice))
+	tpOrder.Symbol(symbol)
+	tpOrder.TimeInForce(futures.TimeInForceTypeGTC)
+	tpOrder.Type(futures.OrderTypeTakeProfitMarket)
+	tpOrder.WorkingType(futures.WorkingTypeMarkPrice)
+
+	// Create SL order
+	slOrder := futures.CreateOrderService{}
+	slOrder.PositionSide(position_side)
+	slOrder.Quantity(quantity)
+	slOrder.Side(slSide)
+	slOrder.StopPrice(fmt.Sprintf("%.2f", slPrice))
+	slOrder.Symbol(symbol)
+	slOrder.TimeInForce(futures.TimeInForceTypeGTC)
+	slOrder.Type(futures.OrderTypeStopMarket)
+	slOrder.WorkingType(futures.WorkingTypeMarkPrice)
+
+	orders := []*futures.CreateOrderService{&primaryOrder, &tpOrder, &slOrder}
+	resp, err := BinanceClient.NewCreateBatchOrdersService().OrderList(orders).Do(context.Background())
+	if err != nil {
+		fmt.Println("--- error placing batch orders ---", err)
+		return nil, 0.0, 0.0, err
+	}
+
+	return resp, tpPrice, slPrice, nil
+
+}
+
+func fetchAndUpdateBinancePosition(order *futures.Order, v models.Key, db *gorm.DB, api_key string, secret_key string, positionSide futures.PositionSideType, take_profit float64, stop_loss float64) models.Positions {
 	positionsResponse, err := utils.GetBinanceAccountOpenPositions(api_key, secret_key, order.Symbol)
 	if err != nil {
 		fmt.Println("---error getting position data ---", err)
@@ -426,8 +463,8 @@ func fetchAndUpdateBinancePosition(order *futures.CreateOrderResponse, v models.
 		Leverage:     positionsResponse.Leverage,
 		OpenPrice:    positionsResponse.EntryPrice,
 		LiqPrice:     positionsResponse.LiquidationPrice,
-		TakeProfit:   "",
-		StopLoss:     "",
+		TakeProfit:   fmt.Sprintf("%f", take_profit),
+		StopLoss:     fmt.Sprintf("%f", stop_loss),
 		UnrealizedPl: positionsResponse.UnrealizedProfit,
 		MarkPrice:    positionsResponse.MarkPrice,
 		Side:         side,
@@ -441,9 +478,10 @@ func fetchAndUpdateBinancePosition(order *futures.CreateOrderResponse, v models.
 	posResponse, createErr := userPosition.UpdateOrCreatePosition(db)
 	if createErr != nil {
 		fmt.Println(userPosition, "---- error creating new position in database ----", createErr)
-		return
+		return models.Positions{}
 	}
-	fmt.Println("---- position saved successfully---", posResponse)
+
+	return *posResponse
 }
 
 func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
@@ -522,10 +560,6 @@ func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_or
 }
 
 func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
-
-	if v.UserEmail != "kmtester@yopmail.com" {
-		return
-	}
 
 	api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
 	if err != nil {

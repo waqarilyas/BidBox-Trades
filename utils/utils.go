@@ -133,6 +133,7 @@ func GetSize(symbol string, first_order float64) (float64, float64, error) {
 
 	return fixedAmount, fprice, nil
 }
+
 func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) {
 	url := "https://api-testnet.bybit.com/v5/market/tickers?category=inverse&symbol=" + symbol
 
@@ -160,6 +161,7 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 
 	return first_order / fprice, fprice, nil
 }
+
 func BinanceRequest(symbol string) (string, error) {
 	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + symbol
 	method := "GET"
