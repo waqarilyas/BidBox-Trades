@@ -144,7 +144,7 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 	return first_order / fprice, fprice, nil
 }
 func BinanceRequest(symbol string) (string, error) {
-	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=BTCUSDT"
+	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + symbol
   method := "GET"
   
   client := &http.Client {

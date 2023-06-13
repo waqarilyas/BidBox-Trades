@@ -17,7 +17,7 @@ import (
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/amir-the-h/okex"
 	"github.com/amir-the-h/okex/api"
-	// "github.com/kryptomind/BidBox-Trades/exchange/binance"
+	"github.com/kryptomind/BidBox-Trades/exchange/binance"
 	// "github.com/kryptomind/BidBox-Trades/helpers"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
@@ -280,18 +280,6 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 	BinanceClient := futures.NewClient(api_key, secret_key)
 	symbol2 := trade_req.CoinPair
 
-	switch symbol2 {
-	case "BTCUSDT":
-		symbol2 = "SBTCSUSDT_SUMCBL"
-	case "EOSUSDT":
-		symbol2 = "SEOSSUSDT_SUMCBL"
-	case "XRPUSDT":
-		symbol2 = "SXRPSUSDT_SUMCBL"
-	case "ETHUSDT":
-		symbol2 = "SETHSUSDT_SUMCBL"
-	default:
-		symbol2 = "SXRPSUSDT_SUMCBL"
-	}
 	x, p, err := utils.GetBinanceSize(symbol2, first_order)
 
 	if err != nil {
@@ -332,11 +320,18 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		positionSide = "SHORT"
 	}
 
-	strValue := fmt.Sprintf("%f", x)
-
+	// strValue := fmt.Sprintf("%f", x)
+	stepSize, err := binance.GetBinanceTradeLimit(symbol2)
+	if err != nil{
+		println("error in calculating limit" + stepSize)
+		return 
+	}
+	precision := int(math.Round(-math.Log10(stepSize)))
+	quantity := math.Round(x*math.Pow(10, float64(precision))) / math.Pow(10, float64(precision))
+	quantity_str := fmt.Sprintf("%f", quantity)
 	order, err := BinanceClient.NewCreateOrderService().Symbol(symbol).
-		Side(side).Type(futures.OrderTypeMarket).
-		Quantity(strValue).
+		Side(side).Type(futures.OrderTypeMarket).PositionSide(positionSide).
+		Quantity(quantity_str).
 		NewOrderResponseType(futures.NewOrderRespTypeRESULT).
 		Do(context.Background())
 	if err != nil {

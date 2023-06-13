@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+	"fmt"
 )
 
 const (
@@ -61,3 +62,44 @@ func GetBinanceAccountDetails(apiKey string, secret string) (*AccountsResponse, 
 }
 
 
+func GetBinanceTradeLimit(coin_pair string) (float64, error) {
+	url := "https://www.binance.com/fapi/v1/exchangeInfo?showall=true"
+	method := "GET"
+	
+	client := &http.Client {
+	}
+	req, err := http.NewRequest(method, url, nil)
+
+	if err != nil {
+		fmt.Println(err)
+		return 0.0, err
+	}
+
+	// req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return 0.0, err
+	}
+	defer res.Body.Close()
+	symbols := BinanceLimitResponse{}
+		if err := json.NewDecoder(res.Body).Decode(&symbols); err != nil {
+			return 0.0, err
+		}
+	var minPrice string
+	for _, symbol := range symbols.SymbolStruct {
+		if symbol.Symbol == coin_pair {
+			minPrice = symbol.Filters[1].StepSize
+			break
+		}
+	}
+	// Check if MinPrice was found
+	if minPrice != "" {
+		fmt.Println("MinPrice for " , coin_pair, minPrice)
+	} else {
+		fmt.Println("BTCUSDT not found")
+	}
+	minPriceFloat , err := strconv.ParseFloat(minPrice, 64)
+	return minPriceFloat, nil
+}
+	
