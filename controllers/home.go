@@ -342,7 +342,7 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		return
 	}
 
-	order := (ordersResponse.Orders[0])
+	order := ordersResponse.Orders[0]
 
 	go fetchAndUpdateBinancePosition(order, v, s.DB, api_key, secret_key, positionSide, takeProfit, stopLoss)
 

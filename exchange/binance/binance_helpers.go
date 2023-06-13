@@ -7,7 +7,6 @@ import (
 	"net/url"
 
 	"strings"
-
 )
 
 func GenerateBinanceSignature(params map[string]string, secretKey string) string {
@@ -18,11 +17,9 @@ func GenerateBinanceSignature(params map[string]string, secretKey string) string
 	}
 
 	queryString = strings.TrimSuffix(queryString, "&")
-
 	mac := hmac.New(sha256.New, []byte(secretKey))
 	mac.Write([]byte(queryString))
 	signature := hex.EncodeToString(mac.Sum(nil))
 
 	return signature
 }
-
