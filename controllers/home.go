@@ -549,20 +549,20 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 	order.ReduceOnly = false
 	order.CloseOnTrigger = false
 	order.OrderType = "Market"
-	switch symbol {
-	case "BTCUSDT":
-		symbol = "SBTCSUSDT_SUMCBL"
-	case "EOSUSDT":
-		symbol = "SEOSSUSDT_SUMCBL"
-	case "XRPUSDT":
-		symbol = "SXRPSUSDT_SUMCBL"
-	case "ETHUSDT":
-		symbol = "SETHSUSDT_SUMCBL"
-	default:
-		symbol = "SXRPSUSDT_SUMCBL"
-	}
+	// switch symbol {
+	// case "BTCUSDT":
+	// 	symbol = "SBTCSUSDT_SUMCBL"
+	// case "EOSUSDT":
+	// 	symbol = "SEOSSUSDT_SUMCBL"
+	// case "XRPUSDT":
+	// 	symbol = "SXRPSUSDT_SUMCBL"
+	// case "ETHUSDT":
+	// 	symbol = "SETHSUSDT_SUMCBL"
+	// default:
+	// 	symbol = "SXRPSUSDT_SUMCBL"
+	// }
 
-	size, p, err := utils.GetSize(symbol, first_order)
+	size, p, err := utils.GetSizeBybit(symbol, first_order)
 
 	if err != nil {
 		log.Fatal(err)

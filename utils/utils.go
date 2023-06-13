@@ -79,6 +79,22 @@ type IndexPriceReq struct {
 	Msg         string `json:"msg"`
 	RequestTime int64  `json:"requestTime"`
 }
+
+type IndexPriceReqBybit struct {
+	RetCode    int         `json:"retCode"`
+	RetMsg     string      `json:"retMsg"`
+	Result     ResultData  `json:"result"`
+	RetExtInfo interface{} `json:"retExtInfo"`
+	Time       int64       `json:"time"`
+}
+
+type ResultData struct {
+	List     []SymbolDetails `json:"list"`
+}
+type SymbolDetails struct {
+	MarkPrice               string `json:"markPrice"`
+}
+
 type IndexPriceReqBinance struct {
 	Symbol string `json:"symbol"`
 	Price  string `json:"price"`
@@ -118,7 +134,7 @@ func GetSize(symbol string, first_order float64) (float64, float64, error) {
 	return fixedAmount, fprice, nil
 }
 func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) {
-	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
+	url := "https://api-testnet.bybit.com/v5/market/tickers?category=inverse&symbol=" + symbol
 
 	client := http.Client{}
 
@@ -128,16 +144,16 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 	}
 	defer res.Body.Close()
 
-	price := IndexPriceReq{}
+	price := IndexPriceReqBybit{}
 	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
 		return 0, 0, err
 	}
 
-	if price.Code != "00000" {
-		return 0, 0, errors.New(price.Msg)
+	if price.RetCode != 0 {
+		return 0, 0, errors.New(price.RetMsg)
 	}
 
-	fprice, err := strconv.ParseFloat(price.Data.Index, 64)
+	fprice, err := strconv.ParseFloat(price.Result.List[0].MarkPrice, 64)
 	if err != nil {
 		return 0, 0, err
 	}
