@@ -22,6 +22,7 @@ import (
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
 	log "github.com/sirupsen/logrus"
+	"github.com/kryptomind/BidBox-Trades/exchange/binance"
 )
 
 var mutex sync.Mutex
@@ -270,7 +271,7 @@ func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *g
 }
 
 func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter, keys []models.Key) {
-
+	
 	futures.UseTestnet = true
 	api_key, secret_key, _, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
 	if err != nil {
@@ -333,9 +334,16 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		positionSide = "BOTH"
 	}
 
-	strValue := strconv.FormatFloat(x, 'f', 3, 64)
-
-	ordersResponse, takeProfit, stopLoss, error := handleBinanceMultiOrder(api_key, secret_key, strValue, symbol, p, positionSide, side)
+	// strValue := strconv.FormatFloat(x, 'f', 3, 64)
+	stepSize, err := binance.GetBinanceTradeLimit(symbol2)
+	if err != nil{
+		println("error in calculating limit", stepSize)
+		return 
+	}
+	precision := int(math.Round(-math.Log10(stepSize)))
+	quantity := math.Round(x*math.Pow(10, float64(precision))) / math.Pow(10, float64(precision))
+	quantity_str := fmt.Sprintf("%f", quantity)
+	ordersResponse, takeProfit, stopLoss, error := handleBinanceMultiOrder(api_key, secret_key, quantity_str, symbol, p, positionSide, side)
 	if error != nil {
 		log.Error("error in order: " + err.Error() + " for " + v.UserEmail)
 		fmt.Println("error in create order", err)
@@ -583,20 +591,20 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 	order.ReduceOnly = false
 	order.CloseOnTrigger = false
 	order.OrderType = "Market"
-	switch symbol {
-	case "BTCUSDT":
-		symbol = "SBTCSUSDT_SUMCBL"
-	case "EOSUSDT":
-		symbol = "SEOSSUSDT_SUMCBL"
-	case "XRPUSDT":
-		symbol = "SXRPSUSDT_SUMCBL"
-	case "ETHUSDT":
-		symbol = "SETHSUSDT_SUMCBL"
-	default:
-		symbol = "SXRPSUSDT_SUMCBL"
-	}
+	// switch symbol {
+	// case "BTCUSDT":
+	// 	symbol = "SBTCSUSDT_SUMCBL"
+	// case "EOSUSDT":
+	// 	symbol = "SEOSSUSDT_SUMCBL"
+	// case "XRPUSDT":
+	// 	symbol = "SXRPSUSDT_SUMCBL"
+	// case "ETHUSDT":
+	// 	symbol = "SETHSUSDT_SUMCBL"
+	// default:
+	// 	symbol = "SXRPSUSDT_SUMCBL"
+	// }
 
-	size, p, err := utils.GetSize(symbol, first_order)
+	size, p, err := utils.GetSizeBybit(symbol, first_order)
 
 	if err != nil {
 		log.Fatal(err)
