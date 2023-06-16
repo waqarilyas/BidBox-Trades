@@ -18,11 +18,11 @@ import (
 	"github.com/amir-the-h/okex"
 	"github.com/amir-the-h/okex/api"
 
+	"github.com/kryptomind/BidBox-Trades/exchange/binance"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
 	"github.com/kryptomind/BidBox-Trades/utils"
 	log "github.com/sirupsen/logrus"
-	"github.com/kryptomind/BidBox-Trades/exchange/binance"
 )
 
 var mutex sync.Mutex
@@ -271,7 +271,11 @@ func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *g
 }
 
 func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter, keys []models.Key) {
-	
+
+	if v.UserEmail != "kmtester@yopmail.com" {
+		return
+	}
+
 	futures.UseTestnet = true
 	api_key, secret_key, _, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
 	if err != nil {
@@ -336,9 +340,9 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 
 	// strValue := strconv.FormatFloat(x, 'f', 3, 64)
 	stepSize, err := binance.GetBinanceTradeLimit(symbol2)
-	if err != nil{
+	if err != nil {
 		println("error in calculating limit", stepSize)
-		return 
+		return
 	}
 	precision := int(math.Round(-math.Log10(stepSize)))
 	quantity := math.Round(x*math.Pow(10, float64(precision))) / math.Pow(10, float64(precision))
@@ -397,7 +401,7 @@ func handleBinanceMultiOrder(
 	BinanceClient := futures.NewClient(api_key, secret_key)
 	primaryOrder := futures.CreateOrderService{}
 
-	go BinanceClient.NewCancelAllOpenOrdersService().Symbol(symbol).Do(context.Background())
+	// go BinanceClient.NewCancelAllOpenOrdersService().Symbol(symbol).Do(context.Background())
 
 	primaryOrder.PositionSide(position_side)
 	primaryOrder.Quantity(quantity)
@@ -425,16 +429,32 @@ func handleBinanceMultiOrder(
 		slSide = futures.SideTypeBuy
 	}
 
-	// Create TP order
+	// activationPriceInt := int(marketPrice)
+	// activationPrice := strconv.Itoa(activationPriceInt)
+
+	// Create TP order normal
+	// tpOrder := futures.CreateOrderService{}
+	// tpOrder.PositionSide(position_side)
+	// tpOrder.Quantity(quantity)
+	// tpOrder.Side(tpSide)
+	// tpOrder.StopPrice(fmt.Sprintf("%.2f", tpPrice))
+	// tpOrder.Symbol(symbol)
+	// tpOrder.TimeInForce(futures.TimeInForceTypeGTC)
+	// tpOrder.Type(futures.OrderTypeTakeProfitMarket)
+	// tpOrder.WorkingType(futures.WorkingTypeMarkPrice)
+
+	// Create a trailing stop order for a position
 	tpOrder := futures.CreateOrderService{}
 	tpOrder.PositionSide(position_side)
 	tpOrder.Quantity(quantity)
 	tpOrder.Side(tpSide)
-	tpOrder.StopPrice(fmt.Sprintf("%.2f", tpPrice))
-	tpOrder.Symbol(symbol)
-	tpOrder.TimeInForce(futures.TimeInForceTypeGTC)
-	tpOrder.Type(futures.OrderTypeTakeProfitMarket)
+	tpOrder.CallbackRate("0.1")
+	// tpOrder.ActivationPrice(activationPrice)
+	tpOrder.Type(futures.OrderTypeTrailingStopMarket)
 	tpOrder.WorkingType(futures.WorkingTypeMarkPrice)
+	tpOrder.Symbol(symbol)
+	// tpOrder.StopPrice(fmt.Sprintf("%.2f", tpPrice))
+	tpOrder.TimeInForce(futures.TimeInForceTypeGTC)
 
 	// Create SL order
 	slOrder := futures.CreateOrderService{}
