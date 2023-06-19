@@ -13,6 +13,8 @@ import (
 	"strconv"
 	"time"
 
+	// "io/ioutil"
+
 	helpers "github.com/WAQAR5/bitget-helpers"
 )
 
@@ -78,6 +80,27 @@ type IndexPriceReq struct {
 	RequestTime int64  `json:"requestTime"`
 }
 
+type IndexPriceReqBybit struct {
+	RetCode    int         `json:"retCode"`
+	RetMsg     string      `json:"retMsg"`
+	Result     ResultData  `json:"result"`
+	RetExtInfo interface{} `json:"retExtInfo"`
+	Time       int64       `json:"time"`
+}
+
+type ResultData struct {
+	List     []SymbolDetails `json:"list"`
+}
+type SymbolDetails struct {
+	MarkPrice               string `json:"markPrice"`
+}
+
+type IndexPriceReqBinance struct {
+	Symbol string `json:"symbol"`
+	Price  string `json:"price"`
+	Time   int64  `json:"time"`
+}
+
 func GetSize(symbol string, first_order float64) (float64, float64, error) {
 	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
 
@@ -110,8 +133,9 @@ func GetSize(symbol string, first_order float64) (float64, float64, error) {
 
 	return fixedAmount, fprice, nil
 }
+
 func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) {
-	url := "https://api.bitget.com/api/mix/v1/market/index?symbol=" + symbol
+	url := "https://api-testnet.bybit.com/v5/market/tickers?category=inverse&symbol=" + symbol
 
 	client := http.Client{}
 
@@ -121,20 +145,57 @@ func GetSizeBybit(symbol string, first_order float64) (float64, float64, error) 
 	}
 	defer res.Body.Close()
 
-	price := IndexPriceReq{}
+	price := IndexPriceReqBybit{}
 	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
 		return 0, 0, err
 	}
 
-	if price.Code != "00000" {
-		return 0, 0, errors.New(price.Msg)
+	if price.RetCode != 0 {
+		return 0, 0, errors.New(price.RetMsg)
 	}
 
-	fprice, err := strconv.ParseFloat(price.Data.Index, 64)
+	fprice, err := strconv.ParseFloat(price.Result.List[0].MarkPrice, 64)
 	if err != nil {
 		return 0, 0, err
 	}
 
+	return first_order / fprice, fprice, nil
+}
+
+func BinanceRequest(symbol string) (string, error) {
+	url := "https://fapi.binance.com/fapi/v1/ticker/price?symbol=" + symbol
+	method := "GET"
+
+	client := &http.Client{}
+	req, err := http.NewRequest(method, url, nil)
+
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+
+	req.Header.Add("Content-Type", "application/json")
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Println(err)
+		return "", err
+	}
+	defer res.Body.Close()
+	price := IndexPriceReqBinance{}
+	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
+		return "", err
+	}
+	return price.Price, nil
+}
+func GetBinanceSize(symbol string, first_order float64) (float64, float64, error) {
+	binancePrice, err := BinanceRequest(symbol)
+	if err != nil {
+		return 0, 0, err
+	}
+	fprice, err := strconv.ParseFloat(binancePrice, 64)
+	if err != nil {
+		return 0, 0, err
+	}
 	return first_order / fprice, fprice, nil
 }
 
@@ -168,4 +229,29 @@ func DecryptKeys(api_key string, secret_key string, passphrase string, service s
 	}
 
 	return api_key, secret_key, passphrase, nil
+}
+
+func ConvertStrToFloat64(val string) float64 {
+	num, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return 0.0
+	}
+
+	return num
+}
+
+func ConvertStrToFloat32(val string) float32 {
+	num64, err := strconv.ParseFloat(val, 32)
+	if err != nil {
+		return 0.0
+	}
+
+	num32 := float32(num64)
+
+	if !math.IsInf(float64(num32), 0) {
+		return num32
+	}
+
+	return 0.0
 }

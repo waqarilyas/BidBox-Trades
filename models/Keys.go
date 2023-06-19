@@ -4,8 +4,15 @@ import (
 	"errors"
 	"math"
 
+	"strconv"
+
+	// "github.com/amir-the-h/okex/models/account"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
+	"github.com/kryptomind/BidBox-Trades/exchange/binance"
+	"github.com/kryptomind/BidBox-Trades/exchange/bitget"
+	"github.com/kryptomind/BidBox-Trades/exchange/bybit"
+	"github.com/kryptomind/BidBox-Trades/helpers"
 )
 
 type Key struct {
@@ -30,6 +37,15 @@ func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
 	}
 	return &Keys, nil
 }
+func (u *Key) FindKeysByService(db *gorm.DB, service string) (*[]Key, error) {
+	Keys := []Key{}
+	err := db.Model(&Key{}).Where("service = ?", service).Limit(100).Find(&Keys).Error
+	if err != nil {
+		return &[]Key{}, err
+	}
+	return &Keys, nil
+}
+
 
 func (u *Key) FindKeyById(db *gorm.DB, kid uuid.UUID) (*Key, error) {
 	err := db.Model(Key{}).Where("keyid = ?", kid).Take(&u).Error
@@ -47,6 +63,14 @@ func (u *Key) FindKeysByEmail(db *gorm.DB, email string) (*[]Key, error) {
 	err := db.Model(Key{}).Where("user_email = ?", email).Find(&Keys).Error
 	if err != nil {
 		return &[]Key{}, err
+	}
+	return &Keys, nil
+}
+func FindKeysByEmailandService(db *gorm.DB, email string, service string) (*Key, error) {
+	Keys := Key{}
+	err := db.Model(Key{}).Where("user_email = ? AND service = ? ", email, service).Find(&Keys).Error
+	if err != nil {
+		return &Key{}, err
 	}
 	return &Keys, nil
 }
@@ -137,4 +161,65 @@ func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
 		return &Key{}, err
 	}
 	return u, nil
+}
+func (u *Key) ValidateBalance(db *gorm.DB,email string, service string,trade_amount int ) (error) {
+	user, err := FindKeysByEmailandService(db, email, service)
+	if err != nil {
+		println("error finding user")
+		return err
+	}
+	api_key_decrypted, err := helpers.DecryptStrings(user.ApiKey)
+	secret_key_decrypted, err := helpers.DecryptStrings(user.SecretKey)
+	
+	if err != nil {
+		println("error finding user")
+		return err
+	}
+	if service == "binance"{
+		account,err := binance.GetBinanceAccountDetails(api_key_decrypted, secret_key_decrypted)
+		if err != nil {
+			return err
+		}
+		availableAmount,err := strconv.ParseFloat(account.AvailableBalance, 64)
+		if err != nil {
+			println("error parsing available balance", account.AvailableBalance, availableAmount)
+			return err
+		}
+		tradeAmount := float64(trade_amount)
+		if availableAmount < tradeAmount{
+			return errors.New("InSufficient Balance")
+		}
+		return nil
+		
+	}else if service == "bitget"{
+		passphrase_decrypted, err := helpers.DecryptStrings(user.Passphrase)
+		account,err := bitget.GetBitgetAccountData(api_key_decrypted, secret_key_decrypted, passphrase_decrypted)
+		if err != nil {
+			return err
+		}
+		availableAmount,err := strconv.ParseFloat(account.Data[0].Available, 64)
+		if err != nil {
+			println("error parsing available balance", account.Data[0].Available, availableAmount)
+			return err
+		}
+		tradeAmount := float64(trade_amount)
+		if availableAmount < tradeAmount{
+			return errors.New("InSufficient Balance")
+		}
+		return nil
+	}else if service == "bybit"{
+		account,err := bybit.GetBybitAccountBalance(api_key_decrypted, secret_key_decrypted)
+		if err != nil {
+			return err
+		}
+		if err != nil {
+			return err
+		}
+		tradeAmount := float64(trade_amount)
+		if account.Available < tradeAmount{
+			return errors.New("InSufficient Balance")
+		}
+		return nil
+	}
+	return errors.New("Service Not Found")
 }
