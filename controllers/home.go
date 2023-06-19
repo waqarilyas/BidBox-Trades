@@ -272,10 +272,6 @@ func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *g
 
 func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, w http.ResponseWriter, keys []models.Key) {
 
-	if v.UserEmail != "kmtester@yopmail.com" {
-		return
-	}
-
 	futures.UseTestnet = true
 	api_key, secret_key, _, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "binance")
 	if err != nil {
