@@ -77,6 +77,7 @@ func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
 func (server *Server) Home(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, "Trade Service")
 }
+
 func GetExchangeSpecificKeys(server *Server, service string) []models.Key {
 	key := models.Key{}
 	keys, err := key.FindKeysByService(server.DB, service)
@@ -222,7 +223,8 @@ func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_
 
 		fmt.Println("---- trailing stop order place successfully----", trailingResponse)
 
-		go fetchAndUpdateBitgetPosition(order, v, s.DB, api_key, secret_key, passphrase)
+		// go fetchAndUpdateBitgetPosition(order, v, s.DB, api_key, secret_key, passphrase)
+		go fetchAndUpdateBitgetPosition(order, v, s.DB, api_key, secret_key, passphrase, orderResp.Data.OrderID)
 
 		sp := strings.Split(order.Side, "_")
 
@@ -260,7 +262,7 @@ func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_
 
 }
 
-func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *gorm.DB, api_key string, secret_key string, passphrase string) {
+func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *gorm.DB, api_key string, secret_key string, passphrase string, order_id string) {
 	positionsResponse, err := utils.PerformBitgetPositionQuery(api_key, secret_key, passphrase, order.Symbol)
 	if err != nil {
 		fmt.Println("---error getting position data ---", err)
@@ -284,6 +286,7 @@ func fetchAndUpdateBitgetPosition(order models.OrderRequest, v models.Key, db *g
 		UserEmail:    v.UserEmail,
 		Status:       "opened",
 		Exchange:     "bitget",
+		OrderId:      order_id,
 	}
 
 	posResponse, createErr := userPosition.UpdateOrCreatePosition(db)
@@ -503,9 +506,7 @@ func fetchAndUpdateBinancePosition(order *futures.Order, v models.Key, db *gorm.
 	}
 
 	side := strings.ToLower(string(positionSide))
-
 	oid := fmt.Sprintf("%d", order_id)
-
 	userPosition := models.Positions{
 		Symbol:       order.Symbol,
 		Leverage:     positionsResponse.Leverage,
