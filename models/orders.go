@@ -6,26 +6,28 @@ import (
 
 	"github.com/jinzhu/gorm"
 )
+
 type BybitOrderRequest struct {
-	Category      string `json:"category"`
-	Symbol        string `json:"symbol"`
-	Side          string `json:"side"`
-	OrderType     string `json:"orderType"`
-	Qty           string `json:"qty"`
-	TimeInForce   string `json:"timeInForce"`
-	ReduceOnly    bool   `json:"reduce_only"`
+	Category       string `json:"category"`
+	Symbol         string `json:"symbol"`
+	Side           string `json:"side"`
+	OrderType      string `json:"orderType"`
+	Qty            string `json:"qty"`
+	TimeInForce    string `json:"timeInForce"`
+	ReduceOnly     bool   `json:"reduce_only"`
 	CloseOnTrigger bool   `json:"closeOnTrigger"`
 }
 type BybitResponse struct {
-	RetCode    int                    `json:"retCode"`
-	RetMsg     string                 `json:"retMsg"`
-	Result     struct {
+	RetCode int    `json:"retCode"`
+	RetMsg  string `json:"retMsg"`
+	Result  struct {
 		OrderID     string `json:"orderId"`
 		OrderLinkId string `json:"orderLinkId"`
 	} `json:"result"`
 	RetExtInfo map[string]interface{} `json:"retExtInfo"`
 	Time       int64                  `json:"time"`
 }
+
 // type BybitResponse struct {
 // 	RetCode    int                    `json:"retCode"`
 // 	RetMsg     string                 `json:"retMsg"`
@@ -37,9 +39,6 @@ type BybitResponse struct {
 // 	Time       int64                  `json:"time"`
 // }
 
-
-
-
 type OrderRequest struct {
 	Symbol     string `json:"symbol"`
 	MarginCoin string `json:"marginCoin"`
@@ -48,6 +47,33 @@ type OrderRequest struct {
 	OrderType  string `json:"orderType"`
 	StopLoss   string `json:"presetStopLossPrice"`
 	TakeProfit string `json:"presetTakeProfitPrice"`
+}
+
+type TriggerType string
+type OrderSide string
+
+const (
+	FillPrice   TriggerType = "fill_price"
+	MarketPrice TriggerType = "market_price"
+)
+
+const (
+	OpenLong   OrderSide = "open_long"
+	OpenShort  OrderSide = "open_short"
+	CloseLong  OrderSide = "close_long"
+	CloseShort OrderSide = "close_short"
+	BuySingle  OrderSide = "buy_single"
+	SellSingle OrderSide = "sell_single"
+)
+
+type TrailingStopOrderRequest struct {
+	Symbol       string      `json:"symbol"`
+	MarginCoin   string      `json:"marginCoin"`
+	TriggerPrice string      `json:"triggerPrice"`
+	TriggerType  TriggerType `json:"triggerType"`
+	Size         string      `json:"size"`
+	Side         string      `json:"side"`
+	RangeRate    string      `json:"rangeRate"`
 }
 
 type OrderResponse struct {

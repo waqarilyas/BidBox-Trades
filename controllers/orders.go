@@ -167,6 +167,7 @@ func GenerateBybitSignature(apiKey, apiSecret string, recvWindow, timestamp int6
 	signature := hex.EncodeToString(hmacHash.Sum(nil))
 	return signature
 }
+
 func BybitNewOrder2(api_key string, secret_key string, passphrase string, order *models.BybitOrderRequest) (string, error) {
 	host := "https://api-testnet.bybit.com"
 	path := "/v5/order/create"
@@ -175,7 +176,6 @@ func BybitNewOrder2(api_key string, secret_key string, passphrase string, order 
 	jsonVal, err := json.Marshal(order)
 	if err != nil {
 		log.Error(err)
-		// fmt.Println("failed order: ")
 		return "", err
 	}
 
@@ -195,7 +195,6 @@ func BybitNewOrder2(api_key string, secret_key string, passphrase string, order 
 
 	res, err := client.Do(req)
 	if err != nil {
-		// fmt.Println(err)
 		return "", err
 	}
 
@@ -208,5 +207,57 @@ func BybitNewOrder2(api_key string, secret_key string, passphrase string, order 
 		return "", err
 	}
 	fmt.Println(string(body))
+	return string(body), nil
+}
+
+func BitgetTrailingStopOrder(api_key string, secret_key string, passphrase string, order *models.TrailingStopOrderRequest) (string, error) {
+
+	host := "https://api.bitget.com"
+	path := "/api/mix/v1/plan/placeTrailStop"
+	url := host + path
+
+	method := "POST"
+	client := &http.Client{}
+
+	jsonVal, err := json.Marshal(order)
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+
+	server_time := helpers.GetBitgetServerTimeStamp()
+	signatures := GenerateBitgetSignature(secret_key, api_key, passphrase, "POST", path, server_time, string(jsonVal))
+
+	req, err := http.NewRequest(method, url, bytes.NewBuffer(jsonVal))
+	req.Header.Add("ACCESS-KEY", api_key)
+	req.Header.Add("ACCESS-SIGN", signatures)
+	req.Header.Add("ACCESS-TIMESTAMP", server_time)
+	req.Header.Add("ACCESS-PASSPHRASE", passphrase)
+	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("local", "zh-CN")
+
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+	defer res.Body.Close()
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Error(err)
+		return "", err
+	}
+
+	if res.StatusCode != http.StatusOK {
+
+		return "", errors.New("trailing stop order failed")
+	}
+
 	return string(body), nil
 }

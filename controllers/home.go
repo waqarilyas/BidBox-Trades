@@ -11,13 +11,11 @@ import (
 	"strings"
 	"sync"
 
-	requests "github.com/amir-the-h/okex/requests/rest/trade"
-	"github.com/jinzhu/gorm"
-
 	"github.com/adshao/go-binance/v2/futures"
 	"github.com/amir-the-h/okex"
 	"github.com/amir-the-h/okex/api"
-
+	requests "github.com/amir-the-h/okex/requests/rest/trade"
+	"github.com/jinzhu/gorm"
 	"github.com/kryptomind/BidBox-Trades/exchange/binance"
 	"github.com/kryptomind/BidBox-Trades/models"
 	"github.com/kryptomind/BidBox-Trades/response"
@@ -60,8 +58,8 @@ type TradeRequest struct {
 }
 
 const (
-	TAKE_PROFIT_PERCENTAGE = 20.0
-	STOP_LOSS_PERCENTAGE   = 20.0
+	TAKE_PROFIT_PERCENTAGE = 5.0
+	STOP_LOSS_PERCENTAGE   = 5.0
 )
 
 func (s *Server) handleUpdate(key *models.Key, val int, pos string) {
@@ -91,6 +89,7 @@ func GetExchangeSpecificKeys(server *Server, service string) []models.Key {
 	log.Info("retrieved keys")
 	return *keys
 }
+
 func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	res := make(map[string]string)
 
@@ -107,13 +106,10 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 		response.ERROR(w, http.StatusBadRequest, err)
 		return
 	}
-	fmt.Println("started")
-	//	stop_loss := 0.8 * float64(300)
-	//take_profit := 1.1 * float64(300)
-	for i, v := range keys { // for each user key
+
+	for i, v := range keys {
 		go func(v models.Key, i int) {
 			if v.Service == trade_req.Exchange {
-				fmt.Println("user: ", v.UserEmail)
 
 				if trade_req.Long == 1 && v.OpenLong <= 0 {
 					return
@@ -150,6 +146,11 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 }
 
 func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
+	if v.UserEmail != "kmtester@yopmail.com" {
+		fmt.Println("--- user is not km tester ---")
+		return
+	}
+
 	api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bitget")
 	if err != nil {
 		fmt.Println("error in decryptkeys: ", err)
@@ -159,12 +160,6 @@ func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_
 	order := models.OrderRequest{}
 	orderResp := models.OrderResponse{}
 
-	if trade_req.Long == 1 {
-		order.Side = "open_long"
-	} else {
-		order.Side = "open_short"
-	}
-
 	order.Symbol = trade_req.CoinPair
 	order.MarginCoin = "SUSDT"
 	size, p, err := utils.GetSize(order.Symbol, first_order)
@@ -173,13 +168,23 @@ func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_
 		// fmt.Println(err, " for ", v.UserEmail)
 		return
 	}
+
+	var stopLoss = 0.0
+	var trailingSide = "close_long"
+
+	if trade_req.Long == 1 {
+		order.Side = "open_long"
+		stopLoss = p * (1 - STOP_LOSS_PERCENTAGE/100.0)
+	} else {
+		order.Side = "open_short"
+		stopLoss = p * (1 + STOP_LOSS_PERCENTAGE/100.0)
+		trailingSide = "close_short"
+	}
+
 	order.Size = fmt.Sprintf("%f", size)
 	order.OrderType = "market"
-	// order.StopLoss = fmt.Sprintf("%F", (size * 0.8))
-	// fmt.Println("order size : " + order.Size)
-	// fmt.Println(order)
-	// order.TakeProfit = fmt.Sprintf("%F", (size * 1.1))
-	// // fmt.Println(order.TakeProfit)
+	order.StopLoss = fmt.Sprintf("%d", int(stopLoss))
+
 	go func() {
 		str, err := NewOrder(api_key, secret_key, passphrase, &order)
 		if err != nil {
@@ -197,6 +202,25 @@ func bitgetTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_
 			log.Error(orderResp.Msg + " :: " + v.UserEmail)
 			return
 		}
+
+		triggerPrice := int(p + (p * 0.01))
+
+		trailing_order := models.TrailingStopOrderRequest{
+			Symbol:       trade_req.CoinPair,
+			MarginCoin:   "SUSDT",
+			TriggerPrice: fmt.Sprintf("%d", triggerPrice),
+			TriggerType:  "market_price",
+			Size:         fmt.Sprintf("%f", size),
+			Side:         trailingSide,
+			RangeRate:    "0.1",
+		}
+
+		trailingResponse, trailingError := BitgetTrailingStopOrder(api_key, secret_key, passphrase, &trailing_order)
+		if trailingError != nil {
+			fmt.Println("----- error placing trailing stop order ----", trailingError)
+		}
+
+		fmt.Println("---- trailing stop order place successfully----", trailingResponse)
 
 		go fetchAndUpdateBitgetPosition(order, v, s.DB, api_key, secret_key, passphrase)
 
@@ -278,8 +302,6 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 		fmt.Println("error in decryptkeys: ", err)
 		return
 	}
-
-	// BinanceClient := futures.NewClient(api_key, secret_key)
 
 	symbol2 := trade_req.CoinPair
 
@@ -607,18 +629,6 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 	order.ReduceOnly = false
 	order.CloseOnTrigger = false
 	order.OrderType = "Market"
-	// switch symbol {
-	// case "BTCUSDT":
-	// 	symbol = "SBTCSUSDT_SUMCBL"
-	// case "EOSUSDT":
-	// 	symbol = "SEOSSUSDT_SUMCBL"
-	// case "XRPUSDT":
-	// 	symbol = "SXRPSUSDT_SUMCBL"
-	// case "ETHUSDT":
-	// 	symbol = "SETHSUSDT_SUMCBL"
-	// default:
-	// 	symbol = "SXRPSUSDT_SUMCBL"
-	// }
 
 	size, p, err := utils.GetSizeBybit(symbol, first_order)
 
