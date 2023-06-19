@@ -374,7 +374,7 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 
 	order := ordersResponse.Orders[0]
 
-	go fetchAndUpdateBinancePosition(order, v, s.DB, api_key, secret_key, positionSide, takeProfit, stopLoss)
+	go fetchAndUpdateBinancePosition(order, v, s.DB, api_key, secret_key, positionSide, takeProfit, stopLoss, order.OrderID)
 
 	new_order := models.Order{
 		Email:       v.UserEmail,
@@ -496,13 +496,15 @@ func handleBinanceMultiOrder(
 
 }
 
-func fetchAndUpdateBinancePosition(order *futures.Order, v models.Key, db *gorm.DB, api_key string, secret_key string, positionSide futures.PositionSideType, take_profit float64, stop_loss float64) models.Positions {
+func fetchAndUpdateBinancePosition(order *futures.Order, v models.Key, db *gorm.DB, api_key string, secret_key string, positionSide futures.PositionSideType, take_profit float64, stop_loss float64, order_id int64) models.Positions {
 	positionsResponse, err := utils.GetBinanceAccountOpenPositions(api_key, secret_key, order.Symbol)
 	if err != nil {
 		fmt.Println("---error getting position data ---", err)
 	}
 
 	side := strings.ToLower(string(positionSide))
+
+	oid := fmt.Sprintf("%d", order_id)
 
 	userPosition := models.Positions{
 		Symbol:       order.Symbol,
@@ -519,6 +521,7 @@ func fetchAndUpdateBinancePosition(order *futures.Order, v models.Key, db *gorm.
 		UserEmail:    v.UserEmail,
 		Status:       "opened",
 		Exchange:     "binance",
+		OrderId:      oid,
 	}
 
 	posResponse, createErr := userPosition.UpdateOrCreatePosition(db)
