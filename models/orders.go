@@ -16,6 +16,8 @@ type BybitOrderRequest struct {
 	TimeInForce    string `json:"timeInForce"`
 	ReduceOnly     bool   `json:"reduce_only"`
 	CloseOnTrigger bool   `json:"closeOnTrigger"`
+	TakeProfit     string `json:"takeProfit"`
+	StopLoss       string `json:"stopLoss"`
 }
 type BybitResponse struct {
 	RetCode int    `json:"retCode"`

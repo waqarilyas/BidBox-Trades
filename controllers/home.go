@@ -611,6 +611,12 @@ func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_or
 
 func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
 
+	if v.UserEmail != "kmtester@yopmail.com" {
+		fmt.Println("---- user is not km tester ---")
+		return
+
+	}
+
 	api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
 	if err != nil {
 		fmt.Println("error in decryptkeys: ", err)
@@ -620,11 +626,6 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 	order := models.BybitOrderRequest{}
 	orderResp := models.BybitResponse{}
 
-	if trade_req.Long == 1 {
-		order.Side = "Buy"
-	} else {
-		order.Side = "Sell"
-	}
 	order.Symbol = trade_req.CoinPair
 	symbol := trade_req.CoinPair
 	order.Category = "linear"
@@ -635,13 +636,26 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 	order.OrderType = "Market"
 
 	size, p, err := utils.GetSizeBybit(symbol, first_order)
-
 	if err != nil {
 		log.Fatal(err)
 		fmt.Println(err, " in get size for ", v.UserEmail)
 		return
 	}
+
+	var stopLoss = 0.0
+
+	if trade_req.Long == 1 {
+		order.Side = "Buy"
+		stopLoss = p * (1 - STOP_LOSS_PERCENTAGE/100.0)
+
+	} else {
+		order.Side = "Sell"
+		stopLoss = p * (1 + STOP_LOSS_PERCENTAGE/100.0)
+	}
+
+	order.StopLoss = fmt.Sprintf("%d", int(stopLoss))
 	order.Qty = fmt.Sprintf("%f", size)
+
 	go func() {
 		str, err := BybitNewOrder2(api_key, secret_key, passphrase, &order)
 		if err != nil {
