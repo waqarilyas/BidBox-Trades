@@ -616,12 +616,6 @@ func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_or
 
 func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
 
-	if v.UserEmail != "kmtester@yopmail.com" {
-		fmt.Println("---- user is not km tester ---")
-		return
-
-	}
-
 	api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
 	if err != nil {
 		fmt.Println("error in decryptkeys: ", err)
