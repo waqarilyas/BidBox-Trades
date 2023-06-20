@@ -27,6 +27,8 @@ type Key struct {
 	OpenLong    int
 	TradeAmount int
 	Prev        string
+	Start       bool
+	Mode        string
 }
 
 func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
@@ -45,7 +47,6 @@ func (u *Key) FindKeysByService(db *gorm.DB, service string) (*[]Key, error) {
 	}
 	return &Keys, nil
 }
-
 
 func (u *Key) FindKeyById(db *gorm.DB, kid uuid.UUID) (*Key, error) {
 	err := db.Model(Key{}).Where("keyid = ?", kid).Take(&u).Error
@@ -162,7 +163,7 @@ func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
 	}
 	return u, nil
 }
-func (u *Key) ValidateBalance(db *gorm.DB,email string, service string,trade_amount int ) (error) {
+func (u *Key) ValidateBalance(db *gorm.DB, email string, service string, trade_amount int) error {
 	user, err := FindKeysByEmailandService(db, email, service)
 	if err != nil {
 		println("error finding user")
@@ -170,45 +171,45 @@ func (u *Key) ValidateBalance(db *gorm.DB,email string, service string,trade_amo
 	}
 	api_key_decrypted, err := helpers.DecryptStrings(user.ApiKey)
 	secret_key_decrypted, err := helpers.DecryptStrings(user.SecretKey)
-	
+
 	if err != nil {
 		println("error finding user")
 		return err
 	}
-	if service == "binance"{
-		account,err := binance.GetBinanceAccountDetails(api_key_decrypted, secret_key_decrypted)
+	if service == "binance" {
+		account, err := binance.GetBinanceAccountDetails(api_key_decrypted, secret_key_decrypted)
 		if err != nil {
 			return err
 		}
-		availableAmount,err := strconv.ParseFloat(account.AvailableBalance, 64)
+		availableAmount, err := strconv.ParseFloat(account.AvailableBalance, 64)
 		if err != nil {
 			println("error parsing available balance", account.AvailableBalance, availableAmount)
 			return err
 		}
 		tradeAmount := float64(trade_amount)
-		if availableAmount < tradeAmount{
+		if availableAmount < tradeAmount {
 			return errors.New("InSufficient Balance")
 		}
 		return nil
-		
-	}else if service == "bitget"{
+
+	} else if service == "bitget" {
 		passphrase_decrypted, err := helpers.DecryptStrings(user.Passphrase)
-		account,err := bitget.GetBitgetAccountData(api_key_decrypted, secret_key_decrypted, passphrase_decrypted)
+		account, err := bitget.GetBitgetAccountData(api_key_decrypted, secret_key_decrypted, passphrase_decrypted)
 		if err != nil {
 			return err
 		}
-		availableAmount,err := strconv.ParseFloat(account.Data[0].Available, 64)
+		availableAmount, err := strconv.ParseFloat(account.Data[0].Available, 64)
 		if err != nil {
 			println("error parsing available balance", account.Data[0].Available, availableAmount)
 			return err
 		}
 		tradeAmount := float64(trade_amount)
-		if availableAmount < tradeAmount{
+		if availableAmount < tradeAmount {
 			return errors.New("InSufficient Balance")
 		}
 		return nil
-	}else if service == "bybit"{
-		account,err := bybit.GetBybitAccountBalance(api_key_decrypted, secret_key_decrypted)
+	} else if service == "bybit" {
+		account, err := bybit.GetBybitAccountBalance(api_key_decrypted, secret_key_decrypted)
 		if err != nil {
 			return err
 		}
@@ -216,7 +217,7 @@ func (u *Key) ValidateBalance(db *gorm.DB,email string, service string,trade_amo
 			return err
 		}
 		tradeAmount := float64(trade_amount)
-		if account.Available < tradeAmount{
+		if account.Available < tradeAmount {
 			return errors.New("InSufficient Balance")
 		}
 		return nil

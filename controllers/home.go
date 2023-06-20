@@ -111,7 +111,9 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 	for i, v := range keys {
 		go func(v models.Key, i int) {
 			if v.Service == trade_req.Exchange {
-
+				if !v.Start {
+					return
+				}
 				if trade_req.Long == 1 && v.OpenLong <= 0 {
 					return
 				}
@@ -126,6 +128,9 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
+				if v.Mode == "aggressive" {
+					first_order = first_order * 2
+				}
 				switch trade_req.Exchange {
 				case "bitget":
 					go bitgetTrade(s, v, i, trade_req, first_order, res, keys)
@@ -783,7 +788,7 @@ func (s *Server) UpdateAmount(w http.ResponseWriter, r *http.Request, email stri
 	// checking if user has sufficient balance
 	err := key.ValidateBalance(s.DB, email, service, data["trade_amount"])
 	if err != nil {
-		response.ERROR(w, http.StatusBadRequest, errors.New("Insufficient Balance"))
+		response.ERROR(w, http.StatusBadRequest, errors.New("insufficient balance"))
 		return
 	}
 	keys, err := key.ChangeTradeAmount(s.DB, data["trade_amount"])
