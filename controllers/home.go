@@ -616,6 +616,12 @@ func okexTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_or
 
 func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_order float64, res map[string]string, keys []models.Key) {
 
+	if v.UserEmail != "kmtester@yopmail.com" {
+		fmt.Println("---- user is not km tester ---")
+		return
+
+	}
+
 	api_key, secret_key, passphrase, err := utils.DecryptKeys(v.ApiKey, v.SecretKey, v.Passphrase, "bybit")
 	if err != nil {
 		fmt.Println("error in decryptkeys: ", err)
@@ -625,11 +631,6 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 	order := models.BybitOrderRequest{}
 	orderResp := models.BybitResponse{}
 
-	if trade_req.Long == 1 {
-		order.Side = "Buy"
-	} else {
-		order.Side = "Sell"
-	}
 	order.Symbol = trade_req.CoinPair
 	symbol := trade_req.CoinPair
 	order.Category = "linear"
@@ -640,13 +641,34 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 	order.OrderType = "Market"
 
 	size, p, err := utils.GetSizeBybit(symbol, first_order)
-
 	if err != nil {
 		log.Fatal(err)
 		fmt.Println(err, " in get size for ", v.UserEmail)
 		return
 	}
+
+	var stopLoss = 0.0
+	triggerPrice := int(p + (p * 0.01))
+
+	if trade_req.Long == 1 {
+		order.Side = "Buy"
+		stopLoss = p * (1 - STOP_LOSS_PERCENTAGE/100.0)
+
+	} else {
+		order.Side = "Sell"
+		stopLoss = p * (1 + STOP_LOSS_PERCENTAGE/100.0)
+		triggerPrice = int(p - (p * 0.01))
+	}
+
+	// order.SlLimitPrice = fmt.Sprintf("%d", int(stopLoss))
+	order.SlTriggerBy = "LastPrice"
+	// order.SlOrderType = "Market"
+	order.TpslMode = "Full"
+	order.StopLoss = fmt.Sprintf("%d", int(stopLoss))
 	order.Qty = fmt.Sprintf("%f", size)
+	order.TakeProfit = ""
+	order.TpTriggerBy = "LastPrice"
+
 	go func() {
 		str, err := BybitNewOrder2(api_key, secret_key, passphrase, &order)
 		if err != nil {
@@ -669,6 +691,31 @@ func bybitTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first_o
 			fmt.Println("error in retCode")
 			return
 		}
+
+		// trailing stop order start from here
+
+		trailingStopOrder := models.BybitTrailingStopOrderRequest{
+			Category:     order.Category,
+			Symbol:       order.Symbol,
+			TakeProfit:   "0",
+			StopLoss:     "0",
+			TrailingStop: "1",
+			TpTriggerBy:  "MarkPrice",
+			SlTriggerBy:  "IndexPrice",
+			ActivePrice:  fmt.Sprintf("%d", triggerPrice),
+			TpslMode:     "Full",
+			PositionIdx:  0,
+		}
+
+		trailingResponse, err := BybitTrailingStopOrder(api_key, secret_key, passphrase, &trailingStopOrder)
+		if err != nil {
+			log.Error("failed order: " + err.Error() + " for " + v.UserEmail)
+			return
+		}
+
+		fmt.Println("--- trailing response ---", trailingResponse)
+
+		// trailing stop order ends here
 
 		new_order := models.Order{
 			Email:       v.UserEmail,

@@ -16,6 +16,13 @@ type BybitOrderRequest struct {
 	TimeInForce    string `json:"timeInForce"`
 	ReduceOnly     bool   `json:"reduce_only"`
 	CloseOnTrigger bool   `json:"closeOnTrigger"`
+	TakeProfit     string `json:"takeProfit"`
+	StopLoss       string `json:"stopLoss"`
+	SlTriggerBy    string `json:"slTriggerBy"`
+	TpTriggerBy    string `json:"tpTriggerBy"`
+	TpslMode       string `json:"tpslMode"`
+	SlOrderType    string `json:"slOrderType"`
+	SlLimitPrice   string `json:"slLimitPrice"`
 }
 type BybitResponse struct {
 	RetCode int    `json:"retCode"`
@@ -74,6 +81,25 @@ type TrailingStopOrderRequest struct {
 	Size         string      `json:"size"`
 	Side         string      `json:"side"`
 	RangeRate    string      `json:"rangeRate"`
+}
+
+type BybitTrailingStopOrderRequest struct {
+	Category     string `json:"category"`
+	Symbol       string `json:"symbol"`
+	TakeProfit   string `json:"takeProfit"`
+	StopLoss     string `json:"stopLoss"`
+	TrailingStop string `json:"trailingStop"`
+	ActivePrice  string `json:"activePrice"`
+	TpslMode     string `json:"tpslMode"`
+	TpSize       string `json:"tpSize"`
+	SlSize       string `json:"slSize"`
+	TpOrderType  string `json:"tpOrderType"`
+	SlOrderType  string `json:"slOrderType"`
+	TpTriggerBy  string `json:"tpTriggerBy"`
+	SlTriggerBy  string `json:"slTriggerBy"`
+	TpLimitPrice string `json:"tpLimitPrice"`
+	SlLimitPrice string `json:"slLimitPrice"`
+	PositionIdx  int    `json:"positionIdx"`
 }
 
 type OrderResponse struct {
