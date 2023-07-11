@@ -19,7 +19,7 @@ type Server struct {
 
 type AppData struct {
 	Keys_list  []models.Key
-	Conditions []models.Conditions
+	Conditions []models.ConditionsV2
 }
 
 var app_data AppData
@@ -56,7 +56,7 @@ func (server *Server) InitKeys() {
 	app_data.Keys_list = *keys
 }
 
-func (server *Server) GetExchangeSpecificKeys(service string) ([]models.Key) {
+func (server *Server) GetExchangeSpecificKeys(service string) []models.Key {
 	key := models.Key{}
 	keys, err := key.FindKeysByService(server.DB, service)
 	if err != nil {
@@ -69,13 +69,12 @@ func (server *Server) GetExchangeSpecificKeys(service string) ([]models.Key) {
 	return *keys
 }
 
-
 func (server *Server) InitConditions() {
-	cond := models.Conditions{}
+	cond := models.ConditionsV2{}
 	conds, err := cond.FindAllConditions(server.DB)
 	if err != nil {
 		log.Fatal("error getting keys")
-		app_data.Conditions = []models.Conditions{}
+		app_data.Conditions = []models.ConditionsV2{}
 		return
 	}
 	log.Info("retreived conditions")
