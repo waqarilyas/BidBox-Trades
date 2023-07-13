@@ -122,6 +122,10 @@ type Order struct {
 	Service     string
 	QuoteAmount float64
 	Profit      float64
+	PositionId  int     `json:"position_id"`
+	OrderPrice  string  `json:"order_price"`
+	Fee         float64 `json:"fee"`
+	OrderId     string  `json:"order_id"`
 }
 
 func (o *Order) Initialize(order OrderRequest, email string, client_id string, order_id string) {

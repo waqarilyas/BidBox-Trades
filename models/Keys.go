@@ -1,15 +1,16 @@
 package models
 
 import (
+	"context"
 	"errors"
 	"math"
 
 	"strconv"
 
 	// "github.com/amir-the-h/okex/models/account"
+	"github.com/adshao/go-binance/v2/futures"
 	"github.com/google/uuid"
 	"github.com/jinzhu/gorm"
-	"github.com/kryptomind/BidBox-Trades/exchange/binance"
 	"github.com/kryptomind/BidBox-Trades/exchange/bitget"
 	"github.com/kryptomind/BidBox-Trades/exchange/bybit"
 	"github.com/kryptomind/BidBox-Trades/helpers"
@@ -177,10 +178,16 @@ func (u *Key) ValidateBalance(db *gorm.DB, email string, service string, trade_a
 		return err
 	}
 	if service == "binance" {
-		account, err := binance.GetBinanceAccountDetails(api_key_decrypted, secret_key_decrypted)
-		if err != nil {
-			return err
+
+		futures.UseTestnet = true
+		BinanceClient := futures.NewClient(api_key_decrypted, secret_key_decrypted)
+
+		account, posErr := BinanceClient.NewGetAccountService().Do(context.Background())
+		if posErr != nil {
+
+			return posErr
 		}
+
 		availableAmount, err := strconv.ParseFloat(account.AvailableBalance, 64)
 		if err != nil {
 			println("error parsing available balance", account.AvailableBalance, availableAmount)

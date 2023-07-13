@@ -89,10 +89,10 @@ type IndexPriceReqBybit struct {
 }
 
 type ResultData struct {
-	List     []SymbolDetails `json:"list"`
+	List []SymbolDetails `json:"list"`
 }
 type SymbolDetails struct {
-	MarkPrice               string `json:"markPrice"`
+	MarkPrice string `json:"markPrice"`
 }
 
 type IndexPriceReqBinance struct {
@@ -187,6 +187,7 @@ func BinanceRequest(symbol string) (string, error) {
 	}
 	return price.Price, nil
 }
+
 func GetBinanceSize(symbol string, first_order float64) (float64, float64, error) {
 	binancePrice, err := BinanceRequest(symbol)
 	if err != nil {
