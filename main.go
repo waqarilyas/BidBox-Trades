@@ -3,11 +3,14 @@ package main
 import (
 	"os"
 
+	"github.com/robfig/cron"
 	"github.com/sirupsen/logrus"
 
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/joho/godotenv"
 	"github.com/kryptomind/BidBox-Trades/controllers"
+	"github.com/kryptomind/BidBox-Trades/oogie/pkg/pnl"
+	"github.com/kryptomind/BidBox-Trades/oogie/pkg/trade"
 )
 
 var server = controllers.Server{}
@@ -42,5 +45,15 @@ func Run() {
 }
 
 func main() {
+	c := cron.New()
+
+	trade_cron := trade.TradeCron{}
+	c.AddFunc("@every 20s", trade_cron.Run)
+
+	pnl_cron := pnl.PnlCron{}
+	c.AddFunc("@every 5s", pnl_cron.Run)
+
+	c.Start()
+
 	Run()
 }
