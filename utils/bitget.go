@@ -8,7 +8,7 @@ import (
 
 	"github.com/kryptomind/BidBox-Trades/helpers"
 	// "github.com/kryptomind/bidboxapi/KeyService/helpers"
-)	
+)
 
 type MarginData struct {
 	MarginCoin        string `json:"marginCoin"`
@@ -40,7 +40,7 @@ type MarginDataResponse struct {
 
 func PerformBitgetPositionQuery(apiKey, apiSecret, passphrase string, coin_pair string) (*MarginData, error) {
 	expires := helpers.GetBitgetServerTimeStamp()
-	uri := "/api/mix/v1/position/allPosition?productType=sumcbl"
+	uri := "/api/mix/v1/position/allPosition?productType=" + PRODUCT_TYPE
 	signature := GenerateBitgetSignature(apiSecret, "GET", uri, expires)
 
 	url := fmt.Sprintf("https://api.bitget.com%s", uri)
