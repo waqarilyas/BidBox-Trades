@@ -34,7 +34,7 @@ const (
 	PERCENT_CHANGE = 5
 )
 
-func (s *Server) WebsocketTest() {
+func (s *Server) WebSocketTest() {
 	var paramsList []string
 
 	coinPair := models.CoinPair{}

@@ -129,7 +129,7 @@ func GetSize(symbol string, first_order float64) (float64, float64, error) {
 	tradeAmount := first_order / fprice
 
 	decimalMultiplier := math.Pow(10, float64(3))
-	fixedAmount := math.Round(tradeAmount*decimalMultiplier) / decimalMultiplier
+	fixedAmount := (tradeAmount * decimalMultiplier) / decimalMultiplier
 
 	return fixedAmount, fprice, nil
 }
@@ -185,6 +185,7 @@ func BinanceRequest(symbol string) (string, error) {
 	if err := json.NewDecoder(res.Body).Decode(&price); err != nil {
 		return "", err
 	}
+	fmt.Println(price)
 	return price.Price, nil
 }
 

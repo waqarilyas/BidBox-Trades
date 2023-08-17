@@ -17,19 +17,21 @@ import (
 )
 
 type Key struct {
-	Keyid       uuid.UUID `gorm:"primary_key;type:uuid;default:gen_random_uuid()" json:"key_id"`
-	Uid         string    `gorm:"size:255" json:"uid"`
-	Service     string    `gorm:"size:255;not null" json:"service"`
-	ApiKey      string    `gorm:"not null;unique" json:"api_key"`
-	SecretKey   string    `gorm:"not null;unique" json:"secret_key"`
-	Passphrase  string    `gorm:"" json:"passphrase"`
-	UserEmail   string    `json:"user_email"`
-	OpenShort   int
-	OpenLong    int
-	TradeAmount int
-	Prev        string
-	Start       bool
-	Mode        string
+	Keyid           uuid.UUID `gorm:"primary_key;type:uuid;default:gen_random_uuid()" json:"key_id"`
+	Uid             string    `gorm:"size:255" json:"uid"`
+	Service         string    `gorm:"size:255;not null" json:"service"`
+	ApiKey          string    `gorm:"not null;unique" json:"api_key"`
+	SecretKey       string    `gorm:"not null;unique" json:"secret_key"`
+	Passphrase      string    `gorm:"" json:"passphrase"`
+	UserEmail       string    `json:"user_email"`
+	OpenShort       int
+	OpenLong        int
+	TradeAmount     int
+	Prev            string
+	Start           bool
+	Mode            string
+	AllowedCoins    int
+	CapitalPerTrade float64
 }
 
 func (u *Key) FindAllKeys(db *gorm.DB) (*[]Key, error) {
@@ -130,7 +132,7 @@ func (u *Key) ChangePositions(db *gorm.DB, pos int, pos_type string) (*Key, erro
 }
 
 func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
-	conds := Conditions{}
+	conds := ConditionsV2{}
 	cond, err := conds.FindCondition(db, int(math.Floor(float64(trade_amount/100))*100))
 
 	if err != nil {
@@ -139,7 +141,7 @@ func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
 
 	long := 0
 	short := 0
-	for i := 0; i < cond.Positions; i++ {
+	for i := 0; i < cond.Coins; i++ {
 		if i%2 == 0 {
 			long++
 		} else {
@@ -149,9 +151,11 @@ func (u *Key) ChangeTradeAmount(db *gorm.DB, trade_amount int) (*Key, error) {
 
 	db = db.Model(&Key{}).Where("user_email = ? AND service = ?", u.UserEmail, u.Service).Take(&Key{}).UpdateColumns(
 		map[string]interface{}{
-			"trade_amount": trade_amount,
-			"open_short":   short,
-			"open_long":    long,
+			"trade_amount":      trade_amount,
+			"open_short":        short,
+			"open_long":         long,
+			"allowed_coins":     cond.Coins,
+			"capital_per_trade": cond.FirstOrder,
 		},
 	)
 	if db.Error != nil {

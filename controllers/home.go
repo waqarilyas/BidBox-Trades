@@ -121,13 +121,13 @@ func (s *Server) StartTrade(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				val := int(math.Floor(float64(v.TradeAmount)/100.0) * 100)
-				cond := models.Conditions{}
+				cond := models.ConditionsV2{}
 				c, err := cond.FindCondition(s.DB, val)
 				if err != nil {
 					log.Error(err)
 					return
 				}
-				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Positions)
+				first_order := float64(v.TradeAmount) * 0.08 / float64(c.Coins)
 				if v.Mode == "aggressive" {
 					first_order = first_order * 2
 				}
@@ -312,14 +312,9 @@ func binanceTrade(s *Server, v models.Key, i int, trade_req *TradeRequest, first
 	}
 
 	symbol2 := trade_req.CoinPair
+	fmt.Println(symbol2)
 
 	x, p, err := utils.GetBinanceSize(symbol2, first_order)
-
-	if err != nil {
-		log.Error(err)
-		return
-	}
-
 	var str string
 	symbol := trade_req.CoinPair
 	switch symbol {
