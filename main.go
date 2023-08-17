@@ -8,6 +8,7 @@ import (
 	nested "github.com/antonfisher/nested-logrus-formatter"
 	"github.com/joho/godotenv"
 	"github.com/kryptomind/BidBox-Trades/controllers"
+	"github.com/kryptomind/BidBox-Trades/utils"
 )
 
 var server = controllers.Server{}
@@ -35,6 +36,8 @@ func Run() {
 	}
 
 	server.Initialize(os.Getenv("DB_DRIVER"), os.Getenv("DB_USER"), os.Getenv("DB_PASSWORD"), os.Getenv("DB_PORT"), os.Getenv("DB_HOST"), os.Getenv("DB_NAME"))
+
+	utils.InitSharedData(server.DB)
 	// binance_WS.DB = server.DB
 	// bitget.TestBitget()
 

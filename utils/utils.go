@@ -188,6 +188,7 @@ func BinanceRequest(symbol string) (string, error) {
 	fmt.Println(price)
 	return price.Price, nil
 }
+
 func GetBinanceSize(symbol string, first_order float64) (float64, float64, error) {
 	binancePrice, err := BinanceRequest(symbol)
 	if err != nil {

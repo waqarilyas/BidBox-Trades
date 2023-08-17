@@ -5,9 +5,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"github.com/kryptomind/BidBox-Trades/helpers"
-	// "github.com/kryptomind/bidboxapi/KeyService/helpers"
 
+	"github.com/kryptomind/BidBox-Trades/helpers"
+	shared_utils "github.com/kryptomind/BidBox-Trades/utils"
+	// "github.com/kryptomind/bidboxapi/KeyService/helpers"
 	// "github.com/kryptomind/bidboxapi/AccountsService/api/helpers"
 )
 
@@ -15,7 +16,7 @@ func GetBitgetAccountData(apiKey string, apiSecret string, passphrase string) (*
 	expires := helpers.GetBitgetServerTimeStamp()
 
 	host := "https://api.bitget.com"
-	path := "/api/mix/v1/account/accounts?productType=sumcbl"
+	path := "/api/mix/v1/account/accounts?productType=" + shared_utils.PRODUCT_TYPE
 	url := host + path
 
 	signature := GenerateBitgetSignature(apiSecret, "GET", path, expires)
