@@ -2,23 +2,13 @@ package utils
 
 import (
 	"fmt"
-
-	"github.com/jinzhu/gorm"
-	"github.com/kryptomind/bidboxapi/AccountsService/api/models/admin"
 )
 
 var IS_TESTNET bool = true
 var PRODUCT_TYPE string = "UMCBL"
 var MARGIN_COIN string = "USDT"
 
-func InitSharedData(db *gorm.DB) {
-	var set admin.Settings
-	settings, err := set.GetSettings(db)
-	if err != nil {
-
-		return
-	}
-	IS_TESTNET = settings.IsTestnet
+func InitSharedData(IS_TESTNET bool) {
 
 	if IS_TESTNET {
 		PRODUCT_TYPE = "SUMCBL"

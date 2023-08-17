@@ -8,8 +8,6 @@ import (
 
 	"github.com/kryptomind/BidBox-Trades/helpers"
 	shared_utils "github.com/kryptomind/BidBox-Trades/utils"
-	// "github.com/kryptomind/bidboxapi/KeyService/helpers"
-	// "github.com/kryptomind/bidboxapi/AccountsService/api/helpers"
 )
 
 func GetBitgetAccountData(apiKey string, apiSecret string, passphrase string) (*AccountData, error) {
